@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python -m pip install -e \".[dev]\" -q 2>&1 | tail -10)",
+      "Read(//c/Users/Junaid/AppData/Local/Programs/**)",
+      "Bash(ls /c/Python*)",
+      "Bash(python3 --version 2>&1; python3 -m pip install -e \"/c/Users/Junaid/Projects/SpecVoice[dev]\" -q 2>&1 | tail -10)",
+      "Bash(where.exe python:*)",
+      "Bash(where.exe py:*)",
+      "Read(//c/Users/Junaid/miniconda3/**)",
+      "Read(//c/Users/Junaid/anaconda3/**)",
+      "Read(//usr/**)",
+      "Bash(find /c/Users/Junaid -name \"python3*.exe\" -maxdepth 8 2>/dev/null | head -10; find /c -name \"python.exe\" -maxdepth 6 2>/dev/null | grep -v WindowsApps | head -10)",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git -C /c/Users/Junaid/Projects/SpecVoice commit -m \"$\\(cat <<'EOF'\nInitial commit: SpecVoice backend\n\nCode-aware voice agent built on ElevenLabs Conversational AI. Joins\nphone calls as a senior engineer, reads GitHub repos during the call,\nand produces a structured PR description when the call ends.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git config:*)",
+      "Bash(gh repo:*)",
+      "Bash(powershell.exe -Command \"gh --version\" 2>&1)",
+      "Bash(git push:*)",
+      "Bash(git -C /c/Users/Junaid/Projects/SpecVoice log --oneline && git -C /c/Users/Junaid/Projects/SpecVoice show HEAD:pyproject.toml | grep -A2 pytest)",
+      "Bash(git -C /c/Users/Junaid/Projects/SpecVoice show HEAD:pyproject.toml)",
+      "Bash(git -C /c/Users/Junaid/Projects/SpecVoice add .github/workflows/tests.yml && git -C /c/Users/Junaid/Projects/SpecVoice commit -m \"$\\(cat <<'EOF'\nfix: set PYTHONPATH=. in CI test step\n\nGuarantees the project root is on sys.path before pytest starts,\nso src.code and src.session imports resolve correctly. OS-level env\nvar is more reliable than pytest's pythonpath config in editable installs.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git -C /c/Users/Junaid/Projects/SpecVoice push 2>&1)",
+      "Bash(git -C /c/Users/Junaid/Projects/SpecVoice ls-files src/ | head -30 && echo \"---\" && cat /c/Users/Junaid/Projects/SpecVoice/src/__init__.py)",
+      "Bash(git -C /c/Users/Junaid/Projects/SpecVoice add conftest.py && git -C /c/Users/Junaid/Projects/SpecVoice commit -m \"$\\(cat <<'EOF'\nfix: add root conftest.py to guarantee src.* imports work\n\nConfig-based approaches \\(pytest pythonpath, PYTHONPATH env\\) were not\nreliably picking up the project root. conftest.py runs before any test\ncollection and inserts the project root via __file__ \\(absolute path\\),\nwhich cannot be affected by hatchling's editable install behaviour.\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git -C /c/Users/Junaid/Projects/SpecVoice push 2>&1)",
+      "Bash(npm install:*)",
+      "Bash(cmd //c \"node --version && npm --version\" 2>&1)",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(cmd //c \"npm show @elevenlabs/elevenlabs-js versions --json 2>&1 | tail -5\")",
+      "Bash(cmd //c \"npm install 2>&1\")",
+      "Bash(npm test:*)",
+      "Bash(npx vitest:*)",
+      "Bash(node --experimental-vm-modules node_modules/.bin/vitest run tests/code/local-source.test.ts)",
+      "Bash(node -e \":*)",
+      "Bash(npm run:*)"
+    ]
+  }
+}
