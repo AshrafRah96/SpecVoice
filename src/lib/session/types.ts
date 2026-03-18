@@ -22,6 +22,15 @@ export interface FileRead {
 
 export type SessionStatus = 'active' | 'complete' | 'error'
 
+export type BuildStatus = 'idle' | 'ready' | 'building' | 'complete' | 'error'
+
+export type BuildPhase = 'analyzing' | 'writing' | 'reviewing'
+
+export interface ComplexityAssessment {
+  level: 'low' | 'medium' | 'high'
+  reasoning: string
+}
+
 export interface Session {
   id: string
   repoUrl?: string
@@ -31,11 +40,15 @@ export interface Session {
   filesRead: FileRead[]
   specOutput?: string
   status: SessionStatus
+  callDurationSecs: number | null
+  transcript: string | null
+  buildStatus: BuildStatus
+  prUrl: string | null
+  complexityAssessment: ComplexityAssessment | null
   createdAt: string
   updatedAt: string
 }
 
-export interface SessionEvent {
-  type: 'session_updated'
-  session: Session
-}
+export type SessionEvent =
+  | { type: 'session_updated'; session: Session }
+  | { type: 'call_ended'; sessionId: string; callDurationSecs: number | null }

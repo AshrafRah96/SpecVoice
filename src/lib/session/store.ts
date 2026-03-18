@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import type { Session, SessionEvent } from '@/lib/session/types'
+import type { Session, SessionEvent, BuildStatus, ComplexityAssessment } from '@/lib/session/types'
 
 class SessionStore {
   private sessions = new Map<string, Session>()
@@ -15,12 +15,17 @@ class SessionStore {
       openQuestions: [],
       filesRead: [],
       status: 'active',
+      callDurationSecs: null,
+      transcript: null,
+      buildStatus: 'idle',
+      prUrl: null,
+      complexityAssessment: null,
       createdAt: now,
       updatedAt: now,
       ...data,
     }
     this.sessions.set(session.id, session)
-    this.broadcast(session.id, session)
+    this.broadcastEvent(session.id, { type: 'session_updated', session })
     return session
   }
 
@@ -40,8 +45,20 @@ class SessionStore {
       updatedAt: new Date().toISOString(),
     }
     this.sessions.set(id, updated)
-    this.broadcast(id, updated)
+    this.broadcastEvent(id, { type: 'session_updated', session: updated })
     return updated
+  }
+
+  setBuildStatus(id: string, status: BuildStatus): Session {
+    return this.updateSession(id, { buildStatus: status })
+  }
+
+  setPrUrl(id: string, url: string): Session {
+    return this.updateSession(id, { prUrl: url })
+  }
+
+  setComplexityAssessment(id: string, assessment: ComplexityAssessment): Session {
+    return this.updateSession(id, { complexityAssessment: assessment })
   }
 
   subscribe(sessionId: string, listener: (event: SessionEvent) => void): () => void {
@@ -57,8 +74,7 @@ class SessionStore {
     }
   }
 
-  private broadcast(sessionId: string, session: Session): void {
-    const event: SessionEvent = { type: 'session_updated', session }
+  broadcastEvent(sessionId: string, event: SessionEvent): void {
     this.listeners.get(sessionId)?.forEach(listener => listener(event))
   }
 }

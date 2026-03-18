@@ -1,2 +1,4 @@
-// TODO: populate after live phone call testing — never generate from training data
-export const systemPrompt = ''
+import { readFileSync } from 'fs'
+import { join } from 'path'
+
+export const systemPrompt = readFileSync(join(process.cwd(), 'docs/system-prompt.md'), 'utf-8')
