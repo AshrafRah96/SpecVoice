@@ -35,7 +35,19 @@
       "Bash(npx vitest:*)",
       "Bash(node --experimental-vm-modules node_modules/.bin/vitest run tests/code/local-source.test.ts)",
       "Bash(node -e \":*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(grep -r TtsConversationalModel c:/Users/Junaid/Projects/SpecVoice/node_modules/@elevenlabs/elevenlabs-js/dist --include=*.d.ts -l)",
+      "Bash(NODE_OPTIONS=\"--env-file=.env.local\" npx tsx src/scripts/setup-agent.ts)",
+      "Bash(npx tsx:*)",
+      "Bash(find node_modules/@elevenlabs/elevenlabs-js/dist/api/resources/conversationalAi/resources/tests -name *.d.ts)",
+      "Bash(xargs cat:*)",
+      "Bash(xargs grep:*)",
+      "Bash(find c:/Users/Junaid/Projects/SpecVoice/node_modules/@elevenlabs/elevenlabs-js -name *TestSuiteInvocation*)",
+      "WebFetch(domain:elevenlabs.io)",
+      "Bash(npx tsc:*)"
     ]
-  }
+  },
+  "plansDirectory": "docs/plans/execution"
 }
