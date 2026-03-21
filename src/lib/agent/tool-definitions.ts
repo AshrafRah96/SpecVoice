@@ -1,4 +1,4 @@
-import { LiteralJsonSchemaPropertyType } from '@elevenlabs/elevenlabs-js/api'
+import { LiteralJsonSchemaPropertyType, WebhookToolApiSchemaConfigInputMethod, ToolRequestModel } from '@elevenlabs/elevenlabs-js/api'
 
 // session_id is injected as a dynamic variable by the frontend when starting a conversation.
 // It is passed in the body of every webhook call so route handlers can look up the session.
@@ -14,7 +14,7 @@ const SESSION_ID_PROP = {
 // appUrl is the base URL of this Next.js app (e.g. https://specvoice.example.com).
 // Field names inside toolConfig use camelCase per the SDK (apiSchema, requestBodySchema),
 // even though the REST API reference shows snake_case equivalents.
-export function buildToolConfigs(appUrl: string) {
+export function buildToolConfigs(appUrl: string): ToolRequestModel[] {
   return [
     {
       toolConfig: {
@@ -24,9 +24,9 @@ export function buildToolConfigs(appUrl: string) {
           'List files in the repository. Use at the start of exploration or when moving to a new area. Optionally narrow to a subdirectory.',
         apiSchema: {
           url: `${appUrl}/api/tools/list-files`,
-          method: 'POST',
+          method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
-            type: 'object',
+            type: 'object' as const,
             required: ['session_id'],
             properties: {
               session_id: SESSION_ID_PROP,
@@ -47,9 +47,9 @@ export function buildToolConfigs(appUrl: string) {
           'Read the contents of a file. Use before asking about any specific code area. Request specific line ranges for large files.',
         apiSchema: {
           url: `${appUrl}/api/tools/read-file`,
-          method: 'POST',
+          method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
-            type: 'object',
+            type: 'object' as const,
             required: ['session_id', 'path'],
             properties: {
               session_id: SESSION_ID_PROP,
@@ -78,9 +78,9 @@ export function buildToolConfigs(appUrl: string) {
           'Search for a string across the codebase. Use to find where something is defined or used, and to assess the impact of proposed changes.',
         apiSchema: {
           url: `${appUrl}/api/tools/search-code`,
-          method: 'POST',
+          method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
-            type: 'object',
+            type: 'object' as const,
             required: ['session_id', 'query'],
             properties: {
               session_id: SESSION_ID_PROP,
@@ -105,9 +105,9 @@ export function buildToolConfigs(appUrl: string) {
           'Record an agreed technical decision. Call this every time you and the developer agree on something meaningful — do not batch at the end.',
         apiSchema: {
           url: `${appUrl}/api/tools/save-decision`,
-          method: 'POST',
+          method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
-            type: 'object',
+            type: 'object' as const,
             required: ['session_id', 'summary', 'rationale', 'alternatives_considered', 'relevant_files'],
             properties: {
               session_id: SESSION_ID_PROP,
@@ -120,7 +120,7 @@ export function buildToolConfigs(appUrl: string) {
                 description: 'Why this choice was made.',
               },
               alternatives_considered: {
-                type: 'array',
+                type: 'array' as const,
                 description: 'What was rejected and why.',
                 items: {
                   type: LiteralJsonSchemaPropertyType.String,
@@ -128,7 +128,7 @@ export function buildToolConfigs(appUrl: string) {
                 },
               },
               relevant_files: {
-                type: 'array',
+                type: 'array' as const,
                 description: 'File paths that informed this decision.',
                 items: {
                   type: LiteralJsonSchemaPropertyType.String,
@@ -148,9 +148,9 @@ export function buildToolConfigs(appUrl: string) {
           'Flag an open question that cannot be resolved on this call. Use when something comes up that needs more information or a separate decision.',
         apiSchema: {
           url: `${appUrl}/api/tools/flag-question`,
-          method: 'POST',
+          method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
-            type: 'object',
+            type: 'object' as const,
             required: ['session_id', 'question', 'context'],
             properties: {
               session_id: SESSION_ID_PROP,
@@ -175,9 +175,9 @@ export function buildToolConfigs(appUrl: string) {
           'Generate the final PR spec from all saved decisions and open questions. Call once at the end after the developer confirms the summary.',
         apiSchema: {
           url: `${appUrl}/api/tools/generate-spec`,
-          method: 'POST',
+          method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
-            type: 'object',
+            type: 'object' as const,
             required: ['session_id'],
             properties: {
               session_id: SESSION_ID_PROP,

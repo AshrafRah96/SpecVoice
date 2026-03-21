@@ -22,13 +22,14 @@ export interface FileRead {
 
 export type SessionStatus = 'active' | 'complete' | 'error'
 
-export type BuildStatus = 'idle' | 'ready' | 'building' | 'complete' | 'error'
+export type BuildStatus = 'idle' | 'ready' | 'building' | 'complete' | 'failed'
 
 export type BuildPhase = 'analyzing' | 'writing' | 'reviewing'
 
 export interface ComplexityAssessment {
-  level: 'low' | 'medium' | 'high'
+  score: 'low' | 'medium' | 'high' | 'too_large'
   reasoning: string
+  splitSuggestion?: string[]
 }
 
 export interface Session {
@@ -52,3 +53,8 @@ export interface Session {
 export type SessionEvent =
   | { type: 'session_updated'; session: Session }
   | { type: 'call_ended'; sessionId: string; callDurationSecs: number | null }
+  | { type: 'build_started'; sessionId: string }
+  | { type: 'build_progress'; phase: BuildPhase; detail: string }
+  | { type: 'build_complete'; sessionId: string; prUrl: string }
+  | { type: 'build_failed'; sessionId: string; error: string }
+  | { type: 'build_blocked'; sessionId: string; assessment: ComplexityAssessment }
