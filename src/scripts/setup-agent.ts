@@ -25,6 +25,7 @@ async function main() {
   // silently remove any tool whose ID is absent. Build the full list here every run.
   const toolIds: string[] = []
   for (const config of buildToolConfigs(env.NEXT_PUBLIC_APP_URL)) {
+    if (config.toolConfig.type !== 'webhook') continue
     const name = config.toolConfig.name
     const existingId = toolsByName.get(name)
 
