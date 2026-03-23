@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sessionStore } from '@/lib/session/store'
 import { sessionNotFound } from '@/lib/api/helpers'
+import type { BuildPhase } from '@/lib/session/types'
 
 export async function POST(
   _request: NextRequest,
@@ -27,7 +28,7 @@ export async function POST(
 }
 
 async function simulateBuild(sessionId: string) {
-  const phases: Array<{ phase: 'analyzing' | 'writing' | 'reviewing'; detail: string }> = [
+  const phases: Array<{ phase: BuildPhase; detail: string }> = [
     { phase: 'analyzing', detail: 'Parsing spec decisions and identifying affected modules' },
     { phase: 'writing', detail: 'Generating implementation scaffold' },
     { phase: 'reviewing', detail: 'Running static checks' },
@@ -40,7 +41,7 @@ async function simulateBuild(sessionId: string) {
 
   await new Promise(r => setTimeout(r, 1000))
   const prUrl = 'https://github.com/placeholder/pr/1'
-  sessionStore.setPrUrl(sessionId, prUrl)
-  sessionStore.setBuildStatus(sessionId, 'complete')
+  // Batch prUrl + buildStatus into one updateSession to avoid double session_updated broadcast
+  sessionStore.updateSession(sessionId, { prUrl, buildStatus: 'complete' })
   sessionStore.broadcastEvent(sessionId, { type: 'build_complete', sessionId, prUrl })
 }

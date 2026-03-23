@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import type { Session } from '@/lib/session/types'
 
 interface Props {
@@ -7,6 +8,13 @@ interface Props {
 }
 
 export function SpecPreview({ session }: Props) {
+  // Memoize reversed decisions to avoid O(n) spread+reverse on every render
+  const reversedDecisions = useMemo(
+    () => session ? [...session.decisions].reverse() : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [session?.decisions]
+  )
+
   if (!session) {
     return (
       <div className="p-5 h-full flex items-center justify-center">
@@ -35,6 +43,7 @@ export function SpecPreview({ session }: Props) {
   }
 
   // During call: live decisions
+
   return (
     <div className="p-5 h-full flex flex-col gap-3">
       <h2 className="text-xs font-semibold tracking-widest uppercase" style={{ color: '#888' }}>
@@ -48,7 +57,7 @@ export function SpecPreview({ session }: Props) {
         </div>
       ) : (
         <ul className="flex flex-col gap-3 overflow-y-auto">
-          {[...session.decisions].reverse().map(d => (
+          {reversedDecisions.map(d => (
             <li
               key={d.id}
               className="rounded p-3 text-sm animate-fadeIn"
