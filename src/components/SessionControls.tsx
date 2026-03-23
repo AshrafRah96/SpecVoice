@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useConversation } from '@elevenlabs/react'
-import type { Session } from '@/lib/session/types'
+import type { Session, SessionStatus, BuildStatus } from '@/lib/session/types'
 
 interface Props {
   session: Session | null
@@ -11,14 +11,13 @@ interface Props {
   onCreateSession: (repoUrl: string) => Promise<void>
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  idle: 'Idle',
+const STATUS_LABELS: Record<SessionStatus, string> = {
   active: 'In Call',
   complete: 'Call Ended',
   error: 'Error',
 }
 
-const BUILD_LABELS: Record<string, string> = {
+const BUILD_LABELS: Record<BuildStatus, string> = {
   idle: '',
   ready: 'Spec Ready',
   building: 'Building',

@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import type { FileRead } from '@/lib/session/types'
 
 interface Props {
@@ -14,8 +15,9 @@ function relativeTime(iso: string): string {
 }
 
 export function FileExplorer({ filesRead }: Props) {
-  const sorted = [...filesRead].sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  const sorted = useMemo(
+    () => [...filesRead].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
+    [filesRead]
   )
 
   return (
