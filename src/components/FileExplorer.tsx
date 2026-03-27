@@ -25,7 +25,7 @@ export function FileExplorer({ filesRead }: Props) {
   const active = sorted.length > 0
 
   return (
-    <div className="p-5 h-full flex flex-col">
+    <div data-testid="file-explorer" className="p-5 h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xs font-medium tracking-widest uppercase text-muted-foreground">

@@ -19,7 +19,7 @@ export function SpecPreview({ session }: Props) {
 
   if (!session) {
     return (
-      <div className="p-5 h-full flex items-center justify-center">
+      <div data-testid="spec-preview" className="p-5 h-full flex items-center justify-center">
         <p className="text-xs text-muted-foreground text-center">
           Create a session to see the spec build in real time.
         </p>
@@ -28,18 +28,16 @@ export function SpecPreview({ session }: Props) {
   }
 
   const hasSpec = !!session.specOutput
-  // Keep decisions tab active during call; switch to spec tab automatically only if user hasn't already navigated to decisions
-  const tab = hasSpec && activeTab === 'decisions' && session.decisions.length === 0
-    ? 'spec'
-    : activeTab
+  const tab = activeTab
 
   return (
-    <div className="h-full flex flex-col">
+    <div data-testid="spec-preview" className="h-full flex flex-col">
       {/* Tab bar */}
       <div className="flex border-b border-border/50 px-5 gap-5 flex-none">
         {(['decisions', 'spec'] as const).map(t => (
           <button
             key={t}
+            role="tab"
             onClick={() => setActiveTab(t)}
             disabled={t === 'spec' && !hasSpec}
             className={cn(
