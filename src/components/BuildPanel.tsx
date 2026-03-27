@@ -32,7 +32,7 @@ export function BuildPanel({ session, buildLog, onTriggerBuild, error }: Props) 
 
       {/* Ready to build */}
       {buildStatus === 'ready' && (
-        <Button onClick={onTriggerBuild} size="lg" className="w-full">
+        <Button data-testid="build-button" onClick={onTriggerBuild} size="lg" className="w-full">
           Build It
         </Button>
       )}

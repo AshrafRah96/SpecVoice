@@ -43,9 +43,13 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
 
   const handleStartWebCall = useCallback(async () => {
     const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID
-    if (!agentId) return
-    await conversation.startSession({ agentId, connectionType: 'webrtc' })
-  }, [conversation])
+    if (!agentId || !session) return
+    await conversation.startSession({
+      agentId,
+      connectionType: 'webrtc',
+      dynamicVariables: { session_id: session.id },
+    })
+  }, [conversation, session])
 
   const handleEndWebCall = useCallback(async () => {
     await conversation.endSession()
@@ -126,7 +130,7 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
                 isConnected ? 'bg-success animate-pulse' : 'bg-destructive'
               )}
             />
-            {isConnected ? 'Live' : 'Reconnecting…'}
+            <span data-testid="sse-status">{isConnected ? 'connected' : 'disconnected'}</span>
           </div>
         )}
 
@@ -159,7 +163,7 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
         {session && !session.specOutput && (
           <div className="mt-auto pt-4 border-t border-border/50">
             <p className="text-xs text-muted-foreground mb-1">Dial in with session ID:</p>
-            <code className="block text-xs rounded-md px-2 py-1.5 font-mono bg-muted text-primary break-all">
+            <code data-testid="session-id" className="block text-xs rounded-md px-2 py-1.5 font-mono bg-muted text-primary break-all">
               {session.id}
             </code>
           </div>
