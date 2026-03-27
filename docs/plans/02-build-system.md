@@ -10,6 +10,8 @@ New: `src/lib/build/complexity.ts`, `src/lib/build/executor.ts`, `src/lib/build/
 Tests: `tests/build/complexity.test.ts`, `tests/build/executor.test.ts`, `tests/build/github-pr.test.ts` (skipped)
 Modified: `src/lib/env.ts`, `.env.local.example`
 
+**Session fields added by Feature 02:** `prUrl: string | null` and `complexityAssessment: ComplexityAssessment | null`, both defaulting to `null` on session creation. `ComplexityAssessment` is defined in `types.ts` alongside them. These fields are already in `Session` as of the Feature 01 + scaffold implementation — Feature 02 must not redeclare them locally.
+
 ## Why Claude Code, not raw API calls
 
 I started designing this as a direct Anthropic API call: send spec + code context, get JSON with file changes, parse and commit. Then I realised I was building a worse version of Claude Code. It already reads codebases, writes files, runs tests, catches errors, and iterates until things pass. The `claude -p` headless mode gives me all of that. The `--output-format stream-json` flag lets me parse progress in real time for the dashboard.
@@ -40,6 +42,24 @@ Small (1-3 files): proceed. Medium (4-7): proceed. Large (8-12): proceed with wa
 Line estimate is `files × 50`. Rough heuristic. File count is the real signal.
 
 Open questions force a block regardless of file count. If the planning conversation left things unresolved, the spec isn't ready for code generation.
+
+After a complexity block, set `buildStatus` back to `'ready'`, not `'idle'`. The spec is still present and the session is actionable (the split suggestion is useful). `'idle'` means "no spec yet" — that signals the wrong state to the dashboard.
+
+The `ComplexityAssessment` interface:
+
+```typescript
+interface ComplexityAssessment {
+  fileCount: number
+  openQuestionCount: number
+  lineEstimate: number          // fileCount * 50
+  size: 'small' | 'medium' | 'large' | 'too_large'
+  blocked: boolean
+  blockReason?: 'too_large' | 'open_questions'
+  splitSuggestion?: string[][]  // files grouped by top-level directory, only when blocked
+}
+```
+
+File count comes from `session.decisions.flatMap(d => d.relevantFiles)` deduplicated with a `Set`. Never parse `specOutput` markdown to recover this data.
 
 ## SPEC.md and CONTEXT.md
 
@@ -74,7 +94,7 @@ Always a draft via Octokit. Never auto-merge. Spec is the PR body so reviewers s
 
 ## Concurrency guard
 
-Build route sets `buildStatus: 'assessing'` synchronously before returning 202. Second POST while building gets 409. Simple lock, no distributed coordination needed.
+Build route sets `buildStatus: 'building'` synchronously before returning 202. Second POST while building gets 409. `'assessing'` does not exist in the `BuildStatus` union — it was cut as over-engineering. The gap between returning 202 and `executeBuild` setting `'building'` is sub-millisecond and invisible to the user.
 
 ## Temp directory
 
@@ -99,7 +119,7 @@ build_failed     — error string
 build_blocked    — ComplexityAssessment with split suggestion
 ```
 
-Store gets a public `broadcastEvent(sessionId, event)` method. Existing `updateSession` still fires `session_updated`. Build operations call `broadcastEvent` directly.
+`broadcastEvent(sessionId, event)` is already public on the store — Feature 01 made it public. Do not redefine it. Build operations call it directly.
 
 ## Constraints
 

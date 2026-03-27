@@ -24,12 +24,16 @@ export type SessionStatus = 'active' | 'complete' | 'error'
 
 export type BuildStatus = 'idle' | 'ready' | 'building' | 'complete' | 'failed'
 
-export type BuildPhase = 'analyzing' | 'writing' | 'reviewing'
+export type BuildPhase = 'analyzing' | 'writing' | 'reviewing' | 'cloning' | 'pr'
 
 export interface ComplexityAssessment {
-  score: 'low' | 'medium' | 'high' | 'too_large'
-  reasoning: string
-  splitSuggestion?: string[]
+  fileCount: number
+  openQuestionCount: number
+  lineEstimate: number          // fileCount * 50
+  size: 'small' | 'medium' | 'large' | 'too_large'
+  blocked: boolean
+  blockReason?: 'too_large' | 'open_questions'
+  splitSuggestion?: string[][]  // files grouped by top-level directory, only when blocked
 }
 
 export interface Session {

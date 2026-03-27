@@ -67,6 +67,8 @@ Three new fields on Session: `callDurationSecs: number | null`, `transcript: str
 
 The `BuildStatus` type and the SSE discriminated union are shared with the build system feature. Define them now since they touch the same types file. This avoids a merge conflict later.
 
+The full `BuildStatus` union is: `'idle' | 'ready' | 'building' | 'complete' | 'failed'`. Do not add `'assessing'` — it was cut from Feature 02 (see `04-feature-corrections.md`). Feature 01 defines the complete union so Feature 02 does not need to touch `types.ts` for this.
+
 The store's private `broadcast` becomes public `broadcastEvent(sessionId, event)` to support the new event types.
 
 ## Constraints
