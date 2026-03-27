@@ -23,6 +23,16 @@ Thumbs.db
 # Git worktrees
 .worktrees/
 
+# Claude Code local config (machine-specific paths)
+.claude/settings.local.json
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
+# AI planning notes
+.ai/
+superpowers/
+
 # Logs
 *.log
 npm-debug.log*

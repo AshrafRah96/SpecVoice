@@ -18,7 +18,7 @@ npm run test:agent                           # run behavioural agent evals
 
 ## Stack
 
-Next.js 14+ App Router. TypeScript. @elevenlabs/elevenlabs-js for voice + Twilio phone. @elevenlabs/react for the dashboard conversation widget. Octokit for GitHub. Zod for validation. Tailwind for styling. Vitest for tests. SSE for real-time dashboard updates.
+Next.js 14+ App Router. TypeScript. @elevenlabs/elevenlabs-js for voice + Twilio phone. @elevenlabs/react for the dashboard conversation widget. Octokit for GitHub. Zod for validation. Tailwind + shadcn/ui for styling (Button primitive; Orb and LiveWaveform in `src/components/ui/`). Geist font. `clsx` + `tailwind-merge` via `cn()` in `src/lib/utils.ts`. Vitest for tests. SSE for real-time dashboard updates.
 
 ## Architecture Rules
 
@@ -61,3 +61,5 @@ IMPORTANT: ElevenLabs API changes frequently. Never write ElevenLabs-specific co
 - Never send raw strings over SSE; always JSON-serialize objects matching shared types from src/lib/session/types.ts.
 - Never import ElevenLabs SDK methods without checking current docs first; method signatures change frequently.
 - Never use `setBuildStatus('error')` — `'error'` is not in the BuildStatus union. The correct value is `'failed'`.
+- Never use inline `style={{ color: '#hex' }}` in components — always use Tailwind token classes (`text-primary`, `text-muted-foreground`, etc.) backed by CSS custom properties in `src/app/globals.css`. All colours derive from the token layer.
+- shadcn/ui is in the stack. The Feature 03 "no shadcn" ban is reversed as of Feature 05 (UI redesign). Use shadcn primitives where they fit; avoid full Radix component suite beyond `@radix-ui/react-slot`.
