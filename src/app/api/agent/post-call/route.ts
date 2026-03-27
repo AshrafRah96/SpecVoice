@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
 import { sessionStore } from '@/lib/session/store'
-import { parseRequestBody } from '@/lib/api/helpers'
+import { env } from '@/lib/env'
 
-// TODO: Verify webhook signature using ElevenLabs signing secret before processing.
-// ElevenLabs sends a signature header (exact name TBD). Skip in v1 — documented gap.
+const elevenlabs = new ElevenLabsClient({ apiKey: env.ELEVENLABS_API_KEY })
 
 const TranscriptTurnSchema = z
   .object({
@@ -37,8 +37,23 @@ const PostCallPayloadSchema = z.object({
 })
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const body = await parseRequestBody(req)
-  if (body === null) {
+  const rawBody = await req.text()
+
+  // Verify webhook signature when secret is configured.
+  // constructEvent also parses the JSON, so we use its output directly.
+  if (env.ELEVENLABS_WEBHOOK_SECRET) {
+    const sigHeader = req.headers.get('ElevenLabs-Signature')
+    try {
+      await elevenlabs.webhooks.constructEvent(rawBody, sigHeader ?? '', env.ELEVENLABS_WEBHOOK_SECRET)
+    } catch {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+  }
+
+  let body: unknown
+  try {
+    body = JSON.parse(rawBody)
+  } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
@@ -62,6 +77,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // Single updateSession call = single session_updated broadcast.
   sessionStore.updateSession(sessionId, {
+    status: 'complete',
     callDurationSecs: data.metadata.call_duration_secs,
     transcript: JSON.stringify(data.transcript),
     buildStatus: 'ready',

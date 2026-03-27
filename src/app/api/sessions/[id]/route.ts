@@ -4,9 +4,10 @@ import { sessionNotFound } from '@/lib/api/helpers'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = sessionStore.getSession(params.id)
-  if (!session) return sessionNotFound(params.id)
+  const { id } = await params
+  const session = sessionStore.getSession(id)
+  if (!session) return sessionNotFound(id)
   return NextResponse.json({ session })
 }

@@ -53,6 +53,11 @@ IMPORTANT: ElevenLabs API changes frequently. Never write ElevenLabs-specific co
 - System prompt is in src/lib/agent/system-prompt.ts. Do not modify without explicit instruction.
 - Phone integration uses ElevenLabs native Twilio support; never build custom Twilio webhooks.
 
+- Full documentation: https://elevenlabs.io/docs/eleven-agents
+- API reference: https://elevenlabs.io/docs/api-reference/introduction
+- Agents API: https://elevenlabs.io/docs/api-reference/agents/get
+- Conversations API: https://elevenlabs.io/docs/api-reference/conversations/get
+
 ## Mistakes to Avoid
 
 - Never use `WebSocket` or `ws` package; use SSE via ReadableStream + TransformStream in route handlers.

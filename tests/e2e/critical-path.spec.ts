@@ -1,15 +1,24 @@
-import { test, expect, request } from '@playwright/test'
+import { test, expect } from '@playwright/test'
+import path from 'path'
 
-test('critical path — session creation to buildStatus ready', async ({ page }) => {
+test('critical path — session creation to buildStatus ready', async ({ page, request }) => {
   // ── 1. Load the dashboard ───────────────────────────────────────────────
   await page.goto('/')
-  await expect(page).toHaveTitle(/SpecVoice/)
+  await expect(page).toHaveTitle(/Spec Voice/)
 
   // Left panel should be in idle state — no session yet
   await expect(page.getByText('Start Session')).toBeVisible()
 
   // ── 2. Create a session via the UI ──────────────────────────────────────
-  await page.getByPlaceholder('https://github.com/org/repo').fill('https://github.com/octocat/Hello-World')
+  // Intercept the POST to /api/sessions so the session uses the local test
+  // fixture instead of GitHub — avoids requiring a GitHub token with repo access.
+  const fixturePath = path.resolve('./tests/fixtures/sample-repo')
+  await page.route('**/api/sessions', async route => {
+    if (route.request().method() !== 'POST') { await route.continue(); return }
+    await route.continue({ postData: JSON.stringify({ repoLocalPath: fixturePath }) })
+  })
+
+  await page.getByPlaceholder('https://github.com/org/repo').fill('https://github.com/AshrafRah96/SpecVoice')
   await page.getByRole('button', { name: 'Start Session' }).click()
 
   // SessionControls renders the session ID once the session is created.
@@ -22,18 +31,17 @@ test('critical path — session creation to buildStatus ready', async ({ page })
   await expect(page.locator('[data-testid="sse-status"]')).toHaveText('connected', { timeout: 5000 })
 
   // ── 4. Simulate agent reading a file ────────────────────────────────────
-  const api = await request.newContext()
-
-  await api.post('/api/tools/read-file', {
+  const readFileRes = await request.post('/api/tools/read-file', {
     data: { session_id: sessionId, path: 'README.md' },
   })
+  expect(readFileRes.status(), `read-file failed: ${await readFileRes.text()}`).toBe(200)
 
   // FileExplorer panel should update via SSE without a page reload.
   await expect(page.locator('[data-testid="file-explorer"]')).toContainText('README.md', { timeout: 5000 })
 
   // ── 5. Simulate agent saving a decision ─────────────────────────────────
   // NOTE: snake_case field names — this is what the Zod schema requires.
-  await api.post('/api/tools/save-decision', {
+  await request.post('/api/tools/save-decision', {
     data: {
       session_id: sessionId,
       summary: 'Use Postgres for session storage',
@@ -50,7 +58,7 @@ test('critical path — session creation to buildStatus ready', async ({ page })
   )
 
   // ── 6. Generate the spec ─────────────────────────────────────────────────
-  await api.post('/api/tools/generate-spec', {
+  await request.post('/api/tools/generate-spec', {
     data: { session_id: sessionId },
   })
 
@@ -60,7 +68,7 @@ test('critical path — session creation to buildStatus ready', async ({ page })
 
   // ── 7. Fire the post-call webhook ────────────────────────────────────────
   // NOTE: nested {type, data:{metadata,...}} format — matches what ElevenLabs actually sends.
-  await api.post('/api/agent/post-call', {
+  await request.post('/api/agent/post-call', {
     data: {
       type: 'post_call_transcription',
       data: {
@@ -77,8 +85,8 @@ test('critical path — session creation to buildStatus ready', async ({ page })
   await expect(page.locator('[data-testid="build-button"]')).toBeVisible({ timeout: 5000 })
 
   // ── 8. Confirm session state via API ─────────────────────────────────────
-  const sessionRes = await api.get(`/api/sessions/${sessionId}`)
-  const session = await sessionRes.json()
+  const sessionRes = await request.get(`/api/sessions/${sessionId}`)
+  const { session } = await sessionRes.json()
   expect(session.buildStatus).toBe('ready')
   expect(session.specOutput).toBeTruthy()
   expect(session.callDurationSecs).toBe(142)
