@@ -98,7 +98,7 @@ export function useSession(): UseSessionReturn {
       const res = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo_url: repoUrl }),
+        body: JSON.stringify({ repoUrl }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))

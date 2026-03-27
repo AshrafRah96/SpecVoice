@@ -6,6 +6,7 @@ const envSchema = z.object({
   GITHUB_TOKEN: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().default('http://localhost:3000'),
   ANTHROPIC_API_KEY: z.string().optional(),
+  ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
 })
 
 const parsed = envSchema.safeParse(process.env)

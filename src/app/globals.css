@@ -4,41 +4,41 @@
 
 @layer base {
   :root {
-    /* ElevenAgents-matched palette — HSL channel values, consumed as hsl(var(--token)) */
-    --background: 24 5% 9%;          /* main content area ~#1a1a18 */
-    --foreground: 0 0% 95%;          /* primary text */
+    /* Light theme — HSL channel values, consumed as hsl(var(--token)) */
+    --background: 24 5% 95%;         /* outer wrapper — warm off-white base */
+    --foreground: 0 0% 9%;           /* primary text — near black */
 
-    --card: 24 5% 9%;
-    --card-foreground: 0 0% 95%;
+    --card: 0 0% 100%;               /* centre/right panels — white */
+    --card-foreground: 0 0% 9%;
 
-    --sidebar: 24 5% 7%;             /* sidebar ~#141413, slightly warmer/darker */
+    --sidebar: 24 4% 91%;            /* left panel — one step down from base */
 
-    --muted: 0 0% 13%;
+    --muted: 0 0% 92%;
     --muted-foreground: 0 0% 45%;
 
-    --primary: 0 0% 6%;              /* CTA buttons — near black #0f0f0f */
+    --primary: 0 0% 6%;              /* CTA buttons — near black */
     --primary-foreground: 0 0% 98%;
 
-    --secondary: 0 0% 8%;
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 0 0% 9%;
 
-    --accent: 0 0% 8%;
-    --accent-foreground: 0 0% 95%;
+    --accent: 0 0% 93%;
+    --accent-foreground: 0 0% 9%;
 
     --destructive: 0 60% 45%;
     --destructive-foreground: 0 0% 98%;
-    --destructive-muted: 0 30% 16%;
+    --destructive-muted: 0 40% 93%;
 
-    --success: 142 50% 40%;
+    --success: 142 45% 35%;
     --success-foreground: 0 0% 98%;
-    --success-muted: 142 30% 18%;
+    --success-muted: 142 40% 90%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 4%;
 
-    --border: 0 0% 14%;
-    --input: 0 0% 14%;
-    --ring: 0 0% 20%;
+    --border: 0 0% 86%;
+    --input: 0 0% 86%;
+    --ring: 0 0% 60%;
 
     --radius: 0.375rem;
   }

@@ -5,10 +5,11 @@ import type { SessionEvent } from '@/lib/session/types'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = sessionStore.getSession(params.id)
-  if (!session) return sessionNotFound(params.id)
+  const { id } = await params
+  const session = sessionStore.getSession(id)
+  if (!session) return sessionNotFound(id)
 
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
@@ -18,7 +19,7 @@ export async function GET(
   const initialPayload = `data: ${JSON.stringify({ type: 'session_updated', session })}\n\n`
   writer.write(encoder.encode(initialPayload))
 
-  const unsubscribe = sessionStore.subscribe(params.id, (event: SessionEvent) => {
+  const unsubscribe = sessionStore.subscribe(id, (event: SessionEvent) => {
     const payload = `data: ${JSON.stringify(event)}\n\n`
     writer.write(encoder.encode(payload)).catch(() => {
       // Client already disconnected — abort handler will clean up

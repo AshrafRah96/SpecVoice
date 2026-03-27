@@ -12,7 +12,7 @@ export function Dashboard() {
   return (
     <div className="flex h-screen w-full gap-2 p-2 overflow-hidden bg-background">
       {/* Left panel — 280px fixed */}
-      <aside className="flex-none w-[280px] h-full overflow-y-auto rounded-lg border border-border/50 bg-card">
+      <aside className="flex-none w-[280px] h-full overflow-y-auto rounded-lg border border-border/50 bg-sidebar">
         <SessionControls
           session={session}
           isConnected={isConnected}
