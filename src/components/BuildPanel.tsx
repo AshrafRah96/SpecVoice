@@ -11,6 +11,12 @@ interface Props {
   error: string | null
 }
 
+function groupLabel(group: string[]): string {
+  if (group.length === 0) return '(empty)'
+  const dir = group[0].includes('/') ? group[0].split('/')[0] : '(root)'
+  return `${dir}/: ${group.length} file${group.length !== 1 ? 's' : ''}`
+}
+
 export function BuildPanel({ session, buildLog, onTriggerBuild, error }: Props) {
   if (!session) return null
 
@@ -68,22 +74,29 @@ export function BuildPanel({ session, buildLog, onTriggerBuild, error }: Props) 
         </div>
       )}
 
-      {/* Blocked — complexityAssessment.score === 'too_large' */}
-      {buildStatus !== 'complete' && complexityAssessment?.score === 'too_large' && (
+      {/* Blocked — complexityAssessment.blocked when size === 'too_large' or open questions remain */}
+      {buildStatus !== 'complete' && complexityAssessment?.blocked && (
         <div
           className="rounded p-3 text-xs flex flex-col gap-1"
           style={{ background: '#1a1500', border: '1px solid #3a2e00', color: '#f59e0b' }}
         >
-          <p className="font-semibold">Complexity: Too Large</p>
-          <p style={{ color: '#888' }}>{complexityAssessment.reasoning}</p>
+          <p className="font-semibold">
+            {complexityAssessment.blockReason === 'open_questions'
+              ? `${complexityAssessment.openQuestionCount} open question${complexityAssessment.openQuestionCount !== 1 ? 's' : ''} must be resolved`
+              : `Too large to build in one pass (${complexityAssessment.fileCount} files)`}
+          </p>
           {complexityAssessment.splitSuggestion && (
-            <ul className="mt-1 flex flex-col gap-0.5">
-              {complexityAssessment.splitSuggestion.map(s => (
-                <li key={s} className="font-mono" style={{ color: '#f59e0b' }}>{s}</li>
-              ))}
-            </ul>
+            <>
+              <ul className="mt-1 flex flex-col gap-0.5">
+                {complexityAssessment.splitSuggestion.map((group, i) => (
+                  <li key={i} className="font-mono" style={{ color: '#f59e0b' }}>
+                    {groupLabel(group)}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1" style={{ color: '#888' }}>Split into smaller PRs by directory above.</p>
+            </>
           )}
-          <p className="mt-1" style={{ color: '#888' }}>Split into smaller PRs by directory above.</p>
         </div>
       )}
 

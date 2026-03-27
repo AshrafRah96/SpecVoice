@@ -17,6 +17,10 @@ export async function POST(
     )
   }
 
+  if (!session.specOutput) {
+    return NextResponse.json({ error: 'No spec to build from.' }, { status: 400 })
+  }
+
   sessionStore.setBuildStatus(params.id, 'building')
   sessionStore.broadcastEvent(params.id, { type: 'build_started', sessionId: params.id })
 

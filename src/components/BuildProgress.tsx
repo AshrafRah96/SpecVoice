@@ -13,12 +13,16 @@ const PHASE_LABELS: Record<BuildPhase, string> = {
   analyzing: 'Analyzing',
   writing: 'Writing',
   reviewing: 'Reviewing',
+  cloning: 'Cloning',
+  pr: 'Pull Request',
 }
 
 const PHASE_COLORS: Record<BuildPhase, string> = {
   analyzing: '#6c47ff',
   writing: '#22c55e',
   reviewing: '#f59e0b',
+  cloning: '#3b82f6',
+  pr: '#ec4899',
 }
 
 export function BuildProgress({ entries, isBuilding }: Props) {
