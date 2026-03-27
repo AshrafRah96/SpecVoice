@@ -2,19 +2,16 @@
 
 import { useState, useCallback } from 'react'
 import { useConversation } from '@elevenlabs/react'
-import type { Session, SessionStatus, BuildStatus } from '@/lib/session/types'
+import type { Session, BuildStatus } from '@/lib/session/types'
+import { Button } from '@/components/ui/button'
+import { Orb } from '@/components/ui/Orb'
+import { cn } from '@/lib/utils'
 
 interface Props {
   session: Session | null
   isConnected: boolean
   error: string | null
   onCreateSession: (repoUrl: string) => Promise<void>
-}
-
-const STATUS_LABELS: Record<SessionStatus, string> = {
-  active: 'In Call',
-  complete: 'Call Ended',
-  error: 'Error',
 }
 
 const BUILD_LABELS: Record<BuildStatus, string> = {
@@ -35,7 +32,6 @@ function formatDuration(secs: number | null): string {
 export function SessionControls({ session, isConnected, error, onCreateSession }: Props) {
   const [repoUrl, setRepoUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
   const conversation = useConversation()
 
   const handleCreate = useCallback(async () => {
@@ -55,142 +51,129 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
     await conversation.endSession()
   }, [conversation])
 
-  // SDK only emits 'connected' | 'disconnected'
   const webCallActive = conversation.status === 'connected'
 
+  const orbState: 'idle' | 'listening' | 'talking' =
+    conversation.isSpeaking ? 'talking'
+    : session?.status === 'active' ? 'listening'
+    : 'idle'
+
   return (
-    <div className="p-5 flex flex-col gap-6 h-full">
-      {/* Header */}
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Spec Voice</h1>
-        <p className="text-xs mt-0.5" style={{ color: '#888' }}>Code-aware voice agent</p>
+    <div className="flex flex-col h-full">
+      {/* Orb header */}
+      <div className="flex flex-col items-center gap-3 px-5 pt-8 pb-6 border-b border-border/50">
+        <Orb state={orbState} />
+        <div className="text-center">
+          <h1 className="text-sm font-semibold tracking-tight text-foreground">Spec Voice</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Code-aware voice agent</p>
+        </div>
       </div>
 
-      {/* Repo input */}
-      <div className="flex flex-col gap-2">
-        <label className="text-xs font-medium" style={{ color: '#888' }}>
-          REPOSITORY URL
-        </label>
-        <input
-          type="url"
-          value={repoUrl}
-          onChange={e => setRepoUrl(e.target.value)}
-          placeholder="https://github.com/org/repo"
-          disabled={!!session || submitting}
-          className="w-full rounded px-3 py-2 text-sm font-mono outline-none disabled:opacity-40"
-          style={{
-            background: '#111118',
-            border: '1px solid #1a1a2e',
-            color: '#e5e5e5',
-          }}
-          onKeyDown={e => e.key === 'Enter' && handleCreate()}
-        />
-        <button
-          onClick={handleCreate}
-          disabled={!!session || submitting || !repoUrl.trim()}
-          className="w-full rounded py-2 text-sm font-medium transition-opacity disabled:opacity-40"
-          style={{ background: '#6c47ff', color: '#fff' }}
-        >
-          {submitting ? 'Starting…' : 'Start Session'}
-        </button>
-      </div>
-
-      {/* Session status */}
-      {session && (
-        <div
-          className="rounded p-3 flex flex-col gap-2 text-sm"
-          style={{ background: '#111118', border: '1px solid #1a1a2e' }}
-        >
-          <Row label="Status" value={STATUS_LABELS[session.status] ?? session.status} />
-          {session.buildStatus !== 'idle' && (
-            <Row label="Build" value={BUILD_LABELS[session.buildStatus] ?? session.buildStatus} />
-          )}
-          <Row label="Duration" value={formatDuration(session.callDurationSecs)} />
-          <Row label="Decisions" value={String(session.decisions.length)} />
-          <Row label="Files read" value={String(session.filesRead.length)} />
-        </div>
-      )}
-
-      {/* SSE connection indicator */}
-      {session && (
-        <div className="flex items-center gap-2 text-xs" style={{ color: '#888' }}>
-          <span
-            className="inline-block w-2 h-2 rounded-full"
-            style={{ background: isConnected ? '#22c55e' : '#ef4444' }}
-          />
-          {isConnected ? 'Live' : 'Reconnecting…'}
-        </div>
-      )}
-
-      {/* Web conversation (optional) */}
-      {session && process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID && (
+      {/* Controls body */}
+      <div className="flex flex-col gap-5 p-5 flex-1 overflow-y-auto">
+        {/* Repo input */}
         <div className="flex flex-col gap-2">
-          <p className="text-xs font-medium" style={{ color: '#888' }}>WEB CONVERSATION</p>
-          {!webCallActive ? (
-            <button
-              onClick={handleStartWebCall}
-              className="w-full rounded py-2 text-sm font-medium"
-              style={{ background: '#1a1a2e', color: '#e5e5e5', border: '1px solid #2a2a4e' }}
-            >
-              Start Web Call
-            </button>
-          ) : (
-            <button
-              onClick={handleEndWebCall}
-              className="w-full rounded py-2 text-sm font-medium"
-              style={{ background: '#2a0a0a', color: '#ef4444', border: '1px solid #4e1a1a' }}
-            >
-              End Web Call
-            </button>
-          )}
-          {conversation.isSpeaking && (
-            <div className="flex items-center gap-2 text-xs" style={{ color: '#888' }}>
-              <PulsingDot />
-              Agent speaking
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <p className="text-xs rounded p-2" style={{ background: '#2a0a0a', color: '#ef4444', border: '1px solid #4e1a1a' }}>
-          {error}
-        </p>
-      )}
-
-      {/* Phone number hint */}
-      {session && !session.specOutput && (
-        <div className="mt-auto">
-          <p className="text-xs" style={{ color: '#888' }}>
-            Dial in to your ElevenLabs number and provide session ID:
-          </p>
-          <code
-            className="block mt-1 text-xs rounded px-2 py-1 font-mono break-all"
-            style={{ background: '#111118', color: '#6c47ff' }}
+          <label className="text-xs font-medium tracking-widest uppercase text-muted-foreground">
+            Repository URL
+          </label>
+          <input
+            type="url"
+            value={repoUrl}
+            onChange={e => setRepoUrl(e.target.value)}
+            placeholder="https://github.com/org/repo"
+            disabled={!!session || submitting}
+            className={cn(
+              'w-full rounded-md px-3 py-2 text-xs font-mono outline-none',
+              'bg-muted border border-input text-foreground',
+              'placeholder:text-muted-foreground',
+              'focus:border-primary/60 focus:ring-1 focus:ring-primary/20',
+              'disabled:opacity-40 transition-colors'
+            )}
+            onKeyDown={e => e.key === 'Enter' && handleCreate()}
+          />
+          <Button
+            onClick={handleCreate}
+            disabled={!!session || submitting || !repoUrl.trim()}
+            size="sm"
+            className="w-full"
           >
-            {session.id}
-          </code>
+            {submitting ? 'Starting…' : 'Start Session'}
+          </Button>
         </div>
-      )}
+
+        {/* Session status */}
+        {session && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1">
+              Session
+            </span>
+            <StatusRow label="Status" value={session.status === 'active' ? 'In Call' : 'Ended'} />
+            {session.buildStatus !== 'idle' && (
+              <StatusRow label="Build" value={BUILD_LABELS[session.buildStatus] ?? session.buildStatus} />
+            )}
+            <StatusRow label="Duration" value={formatDuration(session.callDurationSecs)} />
+            <StatusRow label="Decisions" value={String(session.decisions.length)} />
+            <StatusRow label="Files read" value={String(session.filesRead.length)} />
+          </div>
+        )}
+
+        {/* SSE connection indicator */}
+        {session && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span
+              className={cn(
+                'inline-block w-1.5 h-1.5 rounded-full',
+                isConnected ? 'bg-success animate-pulse' : 'bg-destructive'
+              )}
+            />
+            {isConnected ? 'Live' : 'Reconnecting…'}
+          </div>
+        )}
+
+        {/* Web conversation controls */}
+        {session && process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID && (
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground">
+              Web Conversation
+            </span>
+            {!webCallActive ? (
+              <Button variant="outline" size="sm" className="w-full" onClick={handleStartWebCall}>
+                Start Web Call
+              </Button>
+            ) : (
+              <Button variant="destructive" size="sm" className="w-full" onClick={handleEndWebCall}>
+                End Web Call
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <p className="text-xs rounded-md px-3 py-2 bg-destructive/10 text-destructive border border-destructive/20">
+            {error}
+          </p>
+        )}
+
+        {/* Session ID dial-in hint */}
+        {session && !session.specOutput && (
+          <div className="mt-auto pt-4 border-t border-border/50">
+            <p className="text-xs text-muted-foreground mb-1">Dial in with session ID:</p>
+            <code className="block text-xs rounded-md px-2 py-1.5 font-mono bg-muted text-primary break-all">
+              {session.id}
+            </code>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function StatusRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between items-center">
-      <span style={{ color: '#888' }}>{label}</span>
-      <span className="font-mono text-xs">{value}</span>
+    <div className="flex justify-between items-center py-0.5 text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono text-foreground">{value}</span>
     </div>
-  )
-}
-
-function PulsingDot() {
-  return (
-    <span
-      className="inline-block w-2 h-2 rounded-full animate-pulse"
-      style={{ background: '#6c47ff' }}
-    />
   )
 }

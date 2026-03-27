@@ -1,14 +1,16 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { Session } from '@/lib/session/types'
+import { cn } from '@/lib/utils'
 
 interface Props {
   session: Session | null
 }
 
 export function SpecPreview({ session }: Props) {
-  // Memoize reversed decisions to avoid O(n) spread+reverse on every render
+  const [activeTab, setActiveTab] = useState<'decisions' | 'spec'>('decisions')
+
   const reversedDecisions = useMemo(
     () => session ? [...session.decisions].reverse() : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -18,81 +20,84 @@ export function SpecPreview({ session }: Props) {
   if (!session) {
     return (
       <div className="p-5 h-full flex items-center justify-center">
-        <p className="text-sm" style={{ color: '#444' }}>
+        <p className="text-xs text-muted-foreground text-center">
           Create a session to see the spec build in real time.
         </p>
       </div>
     )
   }
 
-  // Post-call: show full spec
-  if (session.specOutput) {
-    return (
-      <div className="p-5 h-full flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-widest uppercase" style={{ color: '#888' }}>
-          PR Spec
-        </h2>
-        <pre
-          className="flex-1 text-xs overflow-auto whitespace-pre-wrap break-words leading-relaxed"
-          style={{ color: '#e5e5e5', fontFamily: 'monospace' }}
-        >
-          {session.specOutput}
-        </pre>
+  const hasSpec = !!session.specOutput
+  // Keep decisions tab active during call; switch to spec tab automatically only if user hasn't already navigated to decisions
+  const tab = hasSpec && activeTab === 'decisions' && session.decisions.length === 0
+    ? 'spec'
+    : activeTab
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Tab bar */}
+      <div className="flex border-b border-border/50 px-5 gap-5 flex-none">
+        {(['decisions', 'spec'] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setActiveTab(t)}
+            disabled={t === 'spec' && !hasSpec}
+            className={cn(
+              'py-3 text-xs font-medium capitalize transition-colors',
+              'border-b-[1px] -mb-px',
+              tab === t
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+              t === 'spec' && !hasSpec && 'opacity-30 cursor-default'
+            )}
+          >
+            {t === 'decisions'
+              ? `Decisions${session.decisions.length > 0 ? ` (${session.decisions.length})` : ''}`
+              : 'Spec'}
+          </button>
+        ))}
       </div>
-    )
-  }
 
-  // During call: live decisions
-
-  return (
-    <div className="p-5 h-full flex flex-col gap-3">
-      <h2 className="text-xs font-semibold tracking-widest uppercase" style={{ color: '#888' }}>
-        Decisions ({session.decisions.length})
-      </h2>
-
-      {session.decisions.length === 0 ? (
-        <div className="flex items-center gap-2 text-sm" style={{ color: '#444' }}>
-          <PulsingDot />
-          Waiting for decisions…
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-3 overflow-y-auto">
-          {reversedDecisions.map(d => (
-            <li
-              key={d.id}
-              className="rounded p-3 text-sm animate-fadeIn"
-              style={{ background: '#111118', border: '1px solid #1a1a2e' }}
-            >
-              <p className="font-medium text-sm" style={{ color: '#e5e5e5' }}>{d.summary}</p>
-              {d.rationale && (
-                <p className="mt-1 text-xs" style={{ color: '#888' }}>{d.rationale}</p>
-              )}
-              {d.relevantFiles.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {d.relevantFiles.map(f => (
-                    <span
-                      key={f}
-                      className="text-xs font-mono rounded px-1.5 py-0.5"
-                      style={{ background: '#1a1a2e', color: '#6c47ff' }}
-                    >
-                      {f}
+      {/* Tab body */}
+      <div className="flex-1 overflow-y-auto p-5">
+        {tab === 'spec' && hasSpec ? (
+          <pre className="text-xs overflow-auto whitespace-pre-wrap break-words leading-relaxed text-foreground font-mono">
+            {session.specOutput}
+          </pre>
+        ) : (
+          <>
+            {session.decisions.length === 0 ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-foreground/20 animate-pulse" />
+                Waiting for decisions…
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-0">
+                {reversedDecisions.map(d => (
+                  <li
+                    key={d.id}
+                    className={cn(
+                      'flex items-center justify-between py-2 px-3 -mx-3',
+                      'border-l-2 border-foreground/20',
+                      'hover:bg-muted/40 transition-colors cursor-default',
+                      'animate-fadeSlideIn'
+                    )}
+                  >
+                    <span className="text-xs text-foreground flex-1 truncate mr-3">
+                      {d.summary}
                     </span>
-                  ))}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+                    {d.relevantFiles.length > 0 && (
+                      <span className="text-xs text-muted-foreground flex-none whitespace-nowrap">
+                        {d.relevantFiles.length} file{d.relevantFiles.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </div>
     </div>
-  )
-}
-
-function PulsingDot() {
-  return (
-    <span
-      className="inline-block w-2 h-2 rounded-full animate-pulse"
-      style={{ background: '#444' }}
-    />
   )
 }

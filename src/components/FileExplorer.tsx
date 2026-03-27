@@ -2,16 +2,18 @@
 
 import { useMemo } from 'react'
 import type { FileRead } from '@/lib/session/types'
+import { LiveWaveform } from '@/components/ui/LiveWaveform'
 
 interface Props {
   filesRead: FileRead[]
 }
 
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  if (diff < 60_000) return 'just now'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
-  return `${Math.floor(diff / 3_600_000)}h ago`
+function formatTime(iso: string): string {
+  const d = new Date(iso)
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `${h}:${m}:${s}`
 }
 
 export function FileExplorer({ filesRead }: Props) {
@@ -20,36 +22,39 @@ export function FileExplorer({ filesRead }: Props) {
     [filesRead]
   )
 
-  return (
-    <div className="p-5 h-full">
-      <h2 className="text-xs font-semibold mb-4 tracking-widest uppercase" style={{ color: '#888' }}>
-        Files Explored
-      </h2>
+  const active = sorted.length > 0
 
+  return (
+    <div className="p-5 h-full flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xs font-medium tracking-widest uppercase text-muted-foreground">
+          Files Explored
+        </h2>
+        <LiveWaveform active={active} bars={8} className="h-4" />
+      </div>
+
+      {/* Empty state */}
       {sorted.length === 0 ? (
-        <p className="text-sm" style={{ color: '#444' }}>
-          Waiting for agent to explore the codebase…
-        </p>
+        <div className="flex flex-col items-center justify-center flex-1 gap-3">
+          <LiveWaveform active={false} bars={12} />
+          <p className="text-xs text-muted-foreground text-center">
+            Waiting for the agent to explore the codebase
+          </p>
+        </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {sorted.map((f, i) => (
+        <ul className="flex flex-col gap-0">
+          {sorted.map((f) => (
             <li
               key={`${f.path}-${f.timestamp}`}
-              className="rounded px-3 py-2 text-sm animate-fadeIn"
-              style={{
-                background: i === 0 ? '#111118' : 'transparent',
-                border: '1px solid',
-                borderColor: i === 0 ? '#1a1a2e' : 'transparent',
-                animationDelay: '0ms',
-              }}
+              className="flex items-center justify-between py-1.5 border-b border-border/30 animate-fadeSlideIn group"
             >
-              <div className="font-mono text-xs break-all" style={{ color: '#e5e5e5' }}>
+              <span className="font-mono text-xs text-foreground/80 group-hover:text-foreground transition-colors truncate mr-3 flex-1">
                 {f.path}
-              </div>
-              <div className="flex justify-between mt-1 text-xs" style={{ color: '#555' }}>
-                <span>{(f.characterCount / 1000).toFixed(1)}k chars</span>
-                <span>{relativeTime(f.timestamp)}</span>
-              </div>
+              </span>
+              <span className="text-xs text-muted-foreground flex-none whitespace-nowrap font-mono">
+                {(f.characterCount / 1000).toFixed(1)}k · {formatTime(f.timestamp)}
+              </span>
             </li>
           ))}
         </ul>
