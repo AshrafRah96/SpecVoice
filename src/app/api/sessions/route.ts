@@ -5,11 +5,11 @@ import { parseRequestBody, validationError } from '@/lib/api/helpers'
 
 const schema = z
   .object({
-    repo_url: z.string().url().optional(),
-    repo_local_path: z.string().optional(),
+    repoUrl: z.string().url().optional(),
+    repoLocalPath: z.string().optional(),
   })
-  .refine(data => data.repo_url || data.repo_local_path, {
-    message: 'Either repo_url or repo_local_path is required',
+  .refine(data => data.repoUrl || data.repoLocalPath, {
+    message: 'Either repoUrl or repoLocalPath is required',
   })
 
 export async function POST(request: NextRequest) {
@@ -18,12 +18,9 @@ export async function POST(request: NextRequest) {
 
   const result = schema.safeParse(body)
   if (!result.success) return validationError(result.error.issues)
-  const { repo_url, repo_local_path } = result.data
+  const { repoUrl, repoLocalPath } = result.data
 
-  const session = sessionStore.createSession({
-    repoUrl: repo_url,
-    repoLocalPath: repo_local_path,
-  })
+  const session = sessionStore.createSession({ repoUrl, repoLocalPath })
 
   return NextResponse.json({ session }, { status: 201 })
 }
