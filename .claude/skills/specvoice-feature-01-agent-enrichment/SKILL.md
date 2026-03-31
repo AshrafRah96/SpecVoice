@@ -19,7 +19,11 @@ Feature 01 configures the ElevenLabs voice agent (voice, speech settings, first 
 
 - Voice ID: `onwK4e9ZLuTAKqWW03F9` (Daniel)
 - Stability: 0.7, Speed: 0.95
-- Silence timeout: ~4 s, high interruption sensitivity
+- Silence timeout: ~4 s (`turnTimeout: 4`)
+- `TurnEagerness.Patient` — agent waits for higher turn-end confidence before responding, preventing it from cutting off a developer mid-explanation
+- LLM: `Llm.ClaudeSonnet45` (configured in ElevenLabs, never called directly from code)
+- `connectionType: 'websocket'` — use this when starting a web call from the dashboard (WebRTC/LiveKit v1 path fails and drops the connection)
+- `clientEvents`: `Audio`, `AgentResponse`, `UserTranscript`
 - First message: "Alright, I've got access to the repo. Give me a moment to look around, then tell me what we're building."
 - Eval criteria: `spec_generated`, `assumptions_challenged`, `code_grounded`
 
@@ -33,7 +37,7 @@ Route: `src/app/api/agent/post-call/route.ts`
 - Updates session: `transcript`, `callDurationSecs`, `buildStatus: 'ready'`
 - Broadcasts `call_ended` SSE event
 - If `session_id` is missing: return HTTP 200 silently — **never return 4xx**, ElevenLabs retries on non-200 and will flood the server
-- Signature verification is not implemented in v1; do not add it
+- Signature verification IS implemented (conditional): when `ELEVENLABS_WEBHOOK_SECRET` is set, calls `elevenlabs.webhooks.constructEvent(rawBody, sigHeader, secret)` — returns 401 on failure
 
 ## Session Types
 

@@ -23,17 +23,19 @@ src/components/
 
 `src/components/hooks/useSession.ts` connects to `/api/sessions/[id]/events` via `EventSource`. It dispatches typed `SessionEvent` objects to plain React state (`useState`/`useReducer`). It reconnects with exponential backoff and cleans up on unmount. There is no Redux or Zustand involved.
 
-SSE events and their effect on state:
+SSE events and their effect on hook state:
 
 | Event | Action |
 |---|---|
-| `session_updated` | Replace full session object |
-| `call_ended` | Transition status indicator only |
-| `build_started` | Clear build log |
-| `build_progress` | Append phase + detail to build log |
-| `build_complete` | Store `prUrl` |
-| `build_failed` | Store error |
-| `build_blocked` | Store `ComplexityAssessment` |
+| `session_updated` | Replace full session object — carries ALL state changes |
+| `call_ended` | **Nothing** — session_updated fires immediately after and carries the state |
+| `build_started` | Clear `buildLog` array |
+| `build_progress` | Append `{phase, detail, timestamp}` to `buildLog` |
+| `build_complete` | **Nothing** — session_updated carries `prUrl` and `buildStatus: 'complete'` |
+| `build_failed` | **Nothing** — session_updated carries `buildStatus: 'failed'` |
+| `build_blocked` | **Nothing** — session_updated carries `complexityAssessment` |
+
+`buildLog` is a separate hook state (`BuildLogEntry[]`), not on the Session object.
 
 ## Status State Machine
 
@@ -79,7 +81,7 @@ Requires `@elevenlabs/react` — install it before importing `useConversation`.
 
 | Attribute | Location |
 |---|---|
-| `session-id` | SessionControls — renders session ID |
+| `session-id` | SessionControls — renders session ID (only visible when `!session.specOutput`) |
 | `sse-status` | SessionControls — SSE connection status |
 | `file-explorer` | FileExplorer root |
 | `spec-preview` | SpecPreview root |
