@@ -13,14 +13,20 @@ Post-call build pipeline triggered by `POST /api/sessions/[id]/build`. Returns 2
 
 ## Complexity Gate
 
-Derive file count from session decisions — do not parse markdown:
+`fileCount = session.filesRead.length` (files the agent read during the call).
 
-```typescript
-const files = new Set(session.decisions.flatMap(d => d.relevantFiles))
-const fileCount = files.size
-```
+`lineEstimate = fileCount * 50`. Size thresholds on lineEstimate:
 
-Thresholds: 1-12 files → proceed. 13+ files OR open questions → blocked.
+| size | lineEstimate | ~files |
+|---|---|---|
+| small | < 500 | < 10 |
+| medium | < 2000 | < 40 |
+| large | < 5000 | < 100 |
+| too_large | ≥ 5000 | ≥ 100 |
+
+Blocked when: `size === 'too_large'` OR `openQuestions.length > 0`.
+
+`splitSuggestion` (only when `too_large`): `session.decisions.flatMap(d => d.relevantFiles)` grouped by top-level directory.
 
 After a complexity block: set `buildStatus = 'ready'` — the spec still exists. Never set `'idle'`.
 
@@ -73,7 +79,7 @@ Never call the Anthropic API directly. Temp dir: `fs.mkdtemp(os.tmpdir())`, alwa
 | 1 | `setBuildStatus('error')` | `setBuildStatus('failed')` — `'error'` is not in BuildStatus |
 | 2 | `{ level: 'low'\|'high'; reasoning: string }` for ComplexityAssessment | Use full shape from types.ts (fileCount, openQuestionCount, lineEstimate, size, blocked, blockReason, splitSuggestion) |
 | 3 | `buildStatus = 'idle'` after complexity block | `buildStatus = 'ready'` — spec is still present |
-| 4 | Parse `specOutput` markdown to count files | `session.decisions.flatMap(d => d.relevantFiles)` deduplicated with Set |
+| 4 | Parse `specOutput` markdown to count files | `fileCount = session.filesRead.length`; `decisions.flatMap` is only for `splitSuggestion` |
 | 5 | Adding `'assessing'` to BuildStatus union | `'assessing'` does not exist; remove it |
 | 6 | Allow build to start when `specOutput` is null | Guard with 400 `"No spec to build from."` before any other work |
 | 7 | `session.specOutput ?? generateSpec(session)` in orchestrator | Remove the fallback entirely; no spec means no build |
