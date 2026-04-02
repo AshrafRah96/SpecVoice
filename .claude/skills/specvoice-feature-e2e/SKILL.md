@@ -23,7 +23,7 @@ Two complementary test layers verify the full SpecVoice data path:
    - `generate_spec` — SSE fires `session_updated` with `specOutput` set.
 4. `GET /api/sessions/{id}` — verify all fields populated.
 5. `POST /api/agent/post-call` with correct payload → `{"received": true}`. SSE fires `call_ended` then `session_updated` with `buildStatus: 'ready'`, `callDurationSecs`, `transcript`.
-6. `POST /api/agent/post-call` with no `session_id` → must return 200 silently (graceful no-op).
+6. `POST /api/agent/post-call` with no `session_id` → must return `200 { ignored: '...' }` (graceful no-op, never 4xx).
 7. `POST /api/sessions/{id}/build` → 202. SSE fires `build_started` then `build_blocked` with `blockReason: 'open_questions'` (open question was flagged in step 3). `buildStatus` returns to `'ready'` — the build never started.
 8. `POST /api/sessions/{id}/build` again while building → 409.
 
@@ -54,8 +54,8 @@ These attributes must exist in components or the Playwright test cannot locate e
 
 | Attribute | Component |
 |---|---|
-| `session-id` | SessionControls — renders session ID |
-| `sse-status` | SessionControls — SSE connection status text "connected" |
+| `session-id` | SessionControls — renders session ID (only visible when `!session.specOutput`) |
+| `sse-status` | SessionControls — SSE connection status text "connected" or "disconnected" |
 | `file-explorer` | FileExplorer root element |
 | `spec-preview` | SpecPreview root element |
 | `build-button` | BuildPanel "Build it" button |

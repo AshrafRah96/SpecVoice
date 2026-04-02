@@ -46,8 +46,11 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
     if (!agentId || !session) return
     await conversation.startSession({
       agentId,
-      connectionType: 'webrtc',
+      connectionType: 'websocket',
       dynamicVariables: { session_id: session.id },
+      overrides: {
+        conversation: { textOnly: false },
+      },
     })
   }, [conversation, session])
 

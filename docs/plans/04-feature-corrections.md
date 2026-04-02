@@ -6,13 +6,13 @@ Apply all of these before running any feature through Claude Code. Some are spec
 
 ## From the feature spec review
 
-Feature 01 defines `BuildStatus` in `types.ts` specifically to prevent Feature 02 from needing to touch that file again. But `assessing` — which Feature 02 introduces as a concurrency guard — never made it into Feature 01's definition. This is moot now because `assessing` is being cut entirely (see below), but the full union Feature 01 should write is `'idle' | 'ready' | 'building' | 'complete' | 'failed'`. Nothing else.
+Feature 01 defines `BuildStatus` in `types.ts` specifically to prevent Feature 02 from needing to touch that file again. But `assessing` — which Feature 02 introduces as a concurrency guard — never made it into Feature 01's definition. This is moot because `assessing` is being cut (see below), but the full union Feature 01 should write is `'idle' | 'ready' | 'building' | 'complete' | 'failed'`. Nothing else.
 
 Feature 02's body says "Store gets a public `broadcastEvent(sessionId, event)` method" as if it's work to do. Feature 01 already does this. Change that line to say the method comes from Feature 01 and should not be redefined.
 
 Feature 02 reads from and writes to `session.prUrl` and `session.complexityAssessment` without either feature declaring when those fields get added to the Session type. Feature 01 is explicit about its three additions (`callDurationSecs`, `transcript`, `buildStatus`) but leaves these two orphaned. Feature 02 needs to claim them — both default to `null` on session creation, and `ComplexityAssessment` is defined alongside them.
 
-Feature 03's status indicator shows `idle → in call → spec ready → building → complete` but never maps these to actual session fields. "In call" and "spec ready" are derived states — Claude Code implementing `SessionControls` will guess and likely get it wrong. Add this before the Components section:
+Feature 03's status indicator shows `idle → in call → spec ready → building → complete` but never maps these to actual session fields. "In call" and "spec ready" are derived states — Claude Code implementing `SessionControls` will guess and get it wrong. Add this before the Components section:
 
 ```
 idle         session is null
@@ -55,7 +55,7 @@ Update the complexity tests to build sessions with `decisions` arrays rather tha
 
 The orchestrator calls `setBuildStatus('error')` in its catch blocks. `'error'` is not in the `BuildStatus` union. Every one of those calls is a compile error. Replace them all with `'failed'`.
 
-The execution plan defines `ComplexityAssessment` as `{ level: 'low' | 'medium' | 'high' | 'too_large'; reasoning: string; splitSuggestion?: string[] }`. That conflicts directly with the shape above on three points: `level` vs `size`, the `low/high` vs `small/large` naming, and `splitSuggestion` typed as a flat `string[]` of pre-formatted strings rather than `string[][]` of structured groups. The plan also drops `fileCount`, `openQuestionCount`, `lineEstimate`, and `blocked` entirely, and invents `reasoning: string` which was never specced. Use the shape above. The plan's definition is wrong.
+The execution plan defines `ComplexityAssessment` as `{ level: 'low' | 'medium' | 'high' | 'too_large'; reasoning: string; splitSuggestion?: string[] }`. That conflicts directly with the shape above on three points: `level` vs `size`, the `low/high` vs `small/large` naming, and `splitSuggestion` typed as a flat `string[]` of pre-formatted strings rather than `string[][]` of structured groups. The plan also drops `fileCount`, `openQuestionCount`, `lineEstimate`, and `blocked`, and invents `reasoning: string` which was never specced. Use the shape above. The plan's definition is wrong.
 
 `BuildPhase` is used in the `spawnClaudeCode` signature and in the `SessionEvent` union but is never defined anywhere. Add it to `types.ts` in Step 1:
 

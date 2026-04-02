@@ -43,7 +43,7 @@ export function buildAgentConfig(appUrl: string, toolIds: string[]) {
       },
       conversation: {
         // Enable live transcript events so the dashboard can display the conversation in real time.
-        clientEvents: [ClientEvent.AgentResponse, ClientEvent.UserTranscript],
+        clientEvents: [ClientEvent.Audio, ClientEvent.AgentResponse, ClientEvent.UserTranscript],
       },
       turn: {
         // 4-second timeout: developers pause mid-thought on phone calls to work through a

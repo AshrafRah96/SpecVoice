@@ -163,7 +163,7 @@ npm run test:e2e
 npm run test:e2e:ui
 ```
 
-The `--ui` mode is worth using for the first run. It shows you exactly what the browser sees at each step, and if an assertion fails you can scrub back in time to see what the DOM looked like when it failed.
+The `--ui` mode is worth using for the first run. It shows what the browser sees at each step, and if an assertion fails you can scrub back to see what the DOM looked like when it failed.
 
 ---
 

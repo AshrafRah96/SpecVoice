@@ -25,7 +25,7 @@ This copies the component registry into `src/components/ui/`. They're yours — 
 
 This is based on the screenshot, not the brand guidelines PDF.
 
-The sidebar is a warm dark tone — around `#141413` or similar — visually distinct from the main content area which sits slightly cooler and lighter, around `#1a1a18`. They're close but the contrast is enough to separate structure from content without a border doing the heavy lifting.
+The sidebar is a warm dark tone — around `#141413` or similar — visually distinct from the main content area which sits slightly cooler and lighter, around `#1a1a18`. They're close but the contrast separates structure from content without a dividing border.
 
 CTAs are solid black (`#0f0f0e` or `#000`) with white text. There is no blue. No purple. No gradient. The "Add test", "Publish", and "Preview" buttons are all the same treatment — pure black, slightly rounded corners, white label. When you want something to be the primary action, you make it black. That's it.
 
@@ -33,9 +33,9 @@ Nav items sit at normal weight, muted white. The active item — "Agents" in the
 
 The tab bar at the top ("Agent", "Workflow", "Tests", etc.) uses a simple bottom border underline for the active tab. Single pixel, white. No background fill, no pill shape.
 
-Status badges are the only place colour appears — green for success, red for fail — and even those are muted, low-saturation. Colour is reserved strictly for semantic meaning.
+Status badges are the only place colour appears — green for success, red for fail — and even those are muted, low-saturation. Colour is reserved for semantic meaning.
 
-Spacing is generous. Nothing is cramped. Content areas have substantial padding. The empty state in the screenshot ("No tests attached") sits centred in a bordered region with a small icon, two lines of text, and a button. Exactly that much, nothing more.
+Spacing is generous. Nothing is cramped. Content areas have substantial padding. The empty state in the screenshot ("No tests attached") sits centred in a bordered region: small icon, two lines of text, one button.
 
 ## Token layer
 
