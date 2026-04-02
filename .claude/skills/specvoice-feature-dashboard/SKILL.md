@@ -82,7 +82,7 @@ Requires `@elevenlabs/react` — install it before importing `useConversation`.
 | Attribute | Location |
 |---|---|
 | `session-id` | SessionControls — renders session ID (only visible when `!session.specOutput`) |
-| `sse-status` | SessionControls — SSE connection status |
+| `sse-status` | SessionControls — SSE connection status text ("connected" or "disconnected") |
 | `file-explorer` | FileExplorer root |
 | `spec-preview` | SpecPreview root |
 | `build-button` | BuildPanel — Build it button |

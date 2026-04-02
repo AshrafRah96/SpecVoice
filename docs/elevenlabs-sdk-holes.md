@@ -1,14 +1,14 @@
 # ElevenLabs SDK — Undocumented Behavior & Workarounds
 
-Gaps discovered while building the SpecVoice test suite. Not bugs, just things the docs don't tell you.
+Gaps discovered while building the SpecVoice test suite. Not bugs. Things the docs don't tell you.
 
 ---
 
 ## 1. `checkAnyToolMatches: true` expects zero tool calls without `toolCallParameters`
 
-You write a unit test with `type: 'tool'`, `checkAnyToolMatches: true`, and no `toolCallParameters`. The agent correctly calls a tool. The test fails with `"Expected 0 tool calls, received 1"`.
+You write a unit test with `type: 'tool'`, `checkAnyToolMatches: true`, and no `toolCallParameters`. The agent calls a tool. The test fails with `"Expected 0 tool calls, received 1"`.
 
-The flag means "pass if any tool call matches the criteria in `toolCallParameters`." Without `toolCallParameters`, there are no criteria — so the vacuous match is zero tool calls. The docs describe this as "pass if any tool call matches the criteria" which sounds like it means any tool call at all. It doesn't.
+The flag means "pass if any tool call matches the criteria in `toolCallParameters`." Without `toolCallParameters`, there are no criteria, so the vacuous match is zero tool calls. The docs describe this as "pass if any tool call matches the criteria" which sounds like it means any tool call at all. It doesn't.
 
 **Fix:** Use `type: 'llm'` with a `successCondition` that describes the expected tool behaviour. The evaluator sees the full agent turn including tool calls, so you get the same coverage. Or, if you specifically need tool-call testing, populate `toolCallParameters.referencedTool` with the tool's workspace ID from `client.conversationalAi.tools.list()`.
 
@@ -23,7 +23,7 @@ The flag means "pass if any tool call matches the criteria in `toolCallParameter
 
 Every unit test fails with `"Missing required dynamic variables in tools: {'session_id'}"` even though your test has nothing to do with tools.
 
-ElevenLabs validates that every dynamic variable declared anywhere in the agent's tool schemas is supplied before running a test. That validation fires regardless of test type — a pure `type: 'llm'` test that never touches a tool still has to pass it.
+ElevenLabs validates that every dynamic variable declared anywhere in the agent's tool schemas is supplied before running a test. That validation fires regardless of test type. A pure `type: 'llm'` test that never touches a tool still has to pass it.
 
 The `dynamicVariables` field does exist in the type definitions for both `CreateToolCallUnitTestRequest` and `CreateResponseUnitTestRequest`, but nothing in the docs flags it as required or explains when validation runs.
 
@@ -115,9 +115,9 @@ simulationSpecification: {
 
 ## 7. camelCase vs snake_case is never documented together
 
-The REST API reference uses `snake_case` throughout. The `@elevenlabs/elevenlabs-js` SDK uses `camelCase` throughout. These are not cross-referenced anywhere — no getting started page, no SDK readme section, no callout in the agent config guide.
+The REST API reference uses `snake_case` throughout. The `@elevenlabs/elevenlabs-js` SDK uses `camelCase` throughout. These are not cross-referenced anywhere: no getting started page, no SDK readme section, no callout in the agent config guide.
 
-The practical consequence is that code written from the REST docs compiles fine but silently does nothing. The SDK accepts loose object shapes in several places, so passing `model_id` instead of `modelId` produces no type error and no runtime error — the field is just ignored.
+The practical consequence is that code written from the REST docs compiles fine but silently does nothing. The SDK accepts loose object shapes in several places, so passing `model_id` instead of `modelId` produces no type error and no runtime error. The field is ignored.
 
 **Fix:** Always write agent config from the TypeScript types, not from the REST reference. If you're unsure of a field name, check the `.d.ts` files or run your editor's autocomplete against the typed request object. Never copy field names from the API reference into SDK calls.
 

@@ -129,7 +129,7 @@ curl -s -X POST http://localhost:3000/api/agent/post-call \
 
 Expected: `{"received": true}` with status 200. SSE stream fires two events: `call_ended` and a `session_updated` with `buildStatus: "ready"`, `callDurationSecs: 183`, and `transcript` populated (stored as a JSON string).
 
-This is the critical transition. If `buildStatus` doesn't flip to `"ready"` here, the "Build it" button never appears in the dashboard.
+If `buildStatus` doesn't flip to `"ready"` here, the "Build it" button won't appear in the dashboard.
 
 ---
 
@@ -148,7 +148,7 @@ curl -s -X POST http://localhost:3000/api/agent/post-call \
   }' | jq
 ```
 
-Expected: `200` with a silent ignored response. Must not return 4xx or 5xx — ElevenLabs retries on anything other than 200 and you'll get flooded.
+Expected: `200` with a silent ignored response. Must not return 4xx or 5xx: ElevenLabs retries on anything other than 200 and you'll get flooded.
 
 ---
 

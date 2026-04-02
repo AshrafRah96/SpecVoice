@@ -16,7 +16,7 @@ Modified: `src/lib/env.ts`, `.env.local.example`
 
 I started designing this as a direct Anthropic API call: send spec + code context, get JSON with file changes, parse and commit. Then I realised I was building a worse version of Claude Code. It already reads codebases, writes files, runs tests, catches errors, and iterates until things pass. The `claude -p` headless mode gives me all of that. The `--output-format stream-json` flag lets me parse progress in real time for the dashboard.
 
-This is also a better story for the portfolio. Using Claude Code as an execution engine inside a product is itself a demonstration of the "AI first" principle.
+Using Claude Code as an execution engine inside a product demonstrates the "AI first" principle.
 
 ## How it works
 
@@ -126,7 +126,7 @@ build_blocked    — ComplexityAssessment with split suggestion
 Never call Anthropic API directly. Claude Code headless mode only.
 Never clone into the server's own directory. Always temp dir.
 Always create PRs as draft. Never auto-merge.
-Never run code generation during the voice call. Strictly post-call.
+Never run code generation during the voice call. Build is post-call only.
 Never use WebSockets. SSE only.
 If session is deleted mid-build, log warning and return. Don't throw.
 

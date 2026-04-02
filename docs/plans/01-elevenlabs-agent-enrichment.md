@@ -11,7 +11,7 @@ Created: `src/app/api/agent/post-call/route.ts`, `tests/api/post-call.test.ts`
 
 ## Why
 
-The agent works but it's running on defaults. Voice, turn-taking, monitoring, all stock. A DevRel engineer should know how to tune an agent for a specific use case and wire up the platform features that make it production-aware. This is the difference between "I got the API working" and "I understand the platform."
+The agent works but it's running on defaults. Voice, turn-taking, monitoring, all stock. A DevRel engineer should know how to tune an agent for a specific use case and wire up the platform features that make it production-aware. The difference shows up in the ElevenLabs dashboard, not in the terminal.
 
 ## What to build
 
@@ -41,7 +41,7 @@ These feed into ElevenLabs analytics. During Day 4 prompt iteration I can filter
 
 Five structured fields extracted post-call: feature_name (string), decisions_count (number), open_questions_count (number), files_explored (number), conversation_outcome (string: spec_completed/abandoned/needs_followup).
 
-This is the metadata that would feed product analytics in production. For the portfolio it shows I think about measurement.
+This is the metadata that would feed product analytics in production.
 
 ### Post-call webhook
 
@@ -49,7 +49,7 @@ New route at `/api/agent/post-call`. When the call ends, ElevenLabs POSTs here.
 
 The endpoint reads `session_id` from dynamic variables (passed when the client starts the conversation, echoed back in the webhook payload per ElevenLabs docs). Stores call duration and transcript on the session. Sets `buildStatus: 'ready'`. Broadcasts `call_ended` via SSE.
 
-Missing session_id or unknown session: return 200 silently so ElevenLabs doesn't retry.
+Missing session_id or unknown session: return 200 so ElevenLabs doesn't retry.
 
 v1 skips webhook signature verification. TODO comment in code, noted in DX audit.
 

@@ -4,9 +4,9 @@ A single-page React dashboard that serves as the visual companion to the phone c
 
 ## Why this matters
 
-The phone call is impressive but invisible. The dashboard is what makes the demo video work. Without it, you're watching someone talk to their laptop for three minutes. With it, the viewer sees files being explored, decisions being recorded, and a spec forming in real time alongside the conversation.
+The phone call is invisible. The dashboard makes the demo video work. Without it, you're watching someone talk to their laptop for three minutes. The dashboard shows files being explored, decisions being recorded, and a spec forming in real time.
 
-It also demonstrates "eye for design" which the job posting calls out explicitly.
+It also demonstrates "eye for design", which the job posting calls out.
 
 ## Layout
 
