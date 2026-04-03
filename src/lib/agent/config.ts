@@ -49,6 +49,10 @@ export function buildAgentConfig(appUrl: string, toolIds: string[]) {
         // 4-second timeout: developers pause mid-thought on phone calls to work through a
         // technical problem. TurnConfig.turnTimeout is in seconds (range 1–30).
         turnTimeout: 4,
+        // 120 seconds: spec finalization triggers 5–10 sequential tool calls (save_decision ×N
+        // + generate_spec) while the user is silent. Default silenceEndCallTimeout cuts the
+        // call mid-tool-chain before the agent can respond.
+        silenceEndCallTimeout: 120,
         // Patient = waits for higher turn-end probability before responding.
         // Prevents the agent from cutting off a developer who's mid-explanation.
         turnEagerness: TurnEagerness.Patient,

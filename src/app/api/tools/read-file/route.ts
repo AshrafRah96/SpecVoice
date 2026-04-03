@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ content })
   } catch (err) {
+    console.error('[read-file] error reading', path, err)
     return errorResponse(err)
   }
 }

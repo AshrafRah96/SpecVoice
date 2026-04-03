@@ -18,7 +18,10 @@ export async function POST(request: NextRequest) {
   if (body === null) return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 })
 
   const result = schema.safeParse(body)
-  if (!result.success) return validationError(result.error.issues)
+  if (!result.success) {
+    console.error('[save-decision] validation failed', result.error.issues, 'body:', JSON.stringify(body))
+    return validationError(result.error.issues)
+  }
   const { session_id, summary, rationale, alternatives_considered, relevant_files } = result.data
 
   const session = sessionStore.getSession(session_id)

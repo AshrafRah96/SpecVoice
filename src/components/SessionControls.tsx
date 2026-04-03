@@ -62,7 +62,7 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
 
   const orbState: 'idle' | 'listening' | 'talking' =
     conversation.isSpeaking ? 'talking'
-    : session?.status === 'active' ? 'listening'
+    : webCallActive ? 'listening'
     : 'idle'
 
   return (
@@ -114,13 +114,23 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
             <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1">
               Session
             </span>
-            <StatusRow label="Status" value={session.status === 'active' ? 'In Call' : 'Ended'} />
+            <StatusRow label="Status" value={webCallActive ? 'In Call' : 'Ended'} />
             {session.buildStatus !== 'idle' && (
               <StatusRow label="Build" value={BUILD_LABELS[session.buildStatus] ?? session.buildStatus} />
             )}
             <StatusRow label="Duration" value={formatDuration(session.callDurationSecs)} />
             <StatusRow label="Decisions" value={String(session.decisions.length)} />
             <StatusRow label="Files read" value={String(session.filesRead.length)} />
+            {webCallActive && (
+              <div className="flex justify-between items-center py-0.5 text-xs">
+                <span className="text-muted-foreground">Reading</span>
+                <span className="font-mono text-foreground/70 truncate ml-3 text-right max-w-[140px]">
+                  {session.filesRead.length > 0
+                    ? session.filesRead[session.filesRead.length - 1].path.split('/').pop()
+                    : <span className="italic text-muted-foreground animate-pulse">exploring…</span>}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
