@@ -5,6 +5,7 @@ out/
 dist/
 build/
 !src/**/build/
+!tests/**/build/
 coverage/
 
 # Environment / secrets
@@ -32,6 +33,10 @@ tsconfig.tsbuildinfo
 # AI planning notes
 .ai/
 superpowers/
+
+# Playwright test artifacts
+test-results/
+playwright-report/
 
 # Logs
 *.log

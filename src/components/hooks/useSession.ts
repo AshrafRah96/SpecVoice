@@ -62,9 +62,12 @@ export function useSession(): UseSessionReturn {
             ])
             break
           case 'build_complete':
-          case 'build_failed':
           case 'build_blocked':
             // session_updated carries the final session state (buildStatus, prUrl, complexityAssessment)
+            break
+          case 'build_failed':
+            // Surface the error so BuildPanel can display it instead of the generic fallback
+            setError(sseEvent.error)
             break
         }
       } catch {

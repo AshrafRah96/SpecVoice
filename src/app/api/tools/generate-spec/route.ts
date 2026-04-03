@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   if (!session) return sessionNotFound(session_id)
 
   const spec = generateSpec(session)
-  sessionStore.updateSession(session_id, { specOutput: spec, status: 'complete' })
+  sessionStore.updateSession(session_id, { specOutput: spec, status: 'complete', buildStatus: 'ready' })
 
   return NextResponse.json({ spec })
 }
