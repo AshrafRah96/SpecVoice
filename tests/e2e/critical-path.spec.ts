@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import path from 'path'
+import { loadEnvVar, buildSignedPostCallRequest } from './helpers'
 
 test('critical path — session creation to buildStatus ready', async ({ page, request }) => {
   // ── 1. Load the dashboard ───────────────────────────────────────────────
@@ -67,19 +68,15 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
   await expect(page.getByRole('tab', { name: 'Spec' })).not.toBeDisabled({ timeout: 5000 })
 
   // ── 7. Fire the post-call webhook ────────────────────────────────────────
-  // NOTE: nested {type, data:{metadata,...}} format — matches what ElevenLabs actually sends.
-  await request.post('/api/agent/post-call', {
-    data: {
-      type: 'post_call_transcription',
-      data: {
-        metadata: { call_duration_secs: 142 },
-        transcript: [{ role: 'agent', message: 'Alright.', time_in_call_secs: 0 }],
-        conversation_initiation_client_data: {
-          dynamic_variables: { session_id: sessionId },
-        },
-      },
-    },
-  })
+  // Sign the request when ELEVENLABS_WEBHOOK_SECRET is configured on the server;
+  // otherwise the route returns 401 and buildStatus never becomes 'ready'.
+  const webhookSecret = loadEnvVar('ELEVENLABS_WEBHOOK_SECRET')
+  const { headers: postCallHeaders, data: postCallBody } = buildSignedPostCallRequest(
+    sessionId!,
+    webhookSecret,
+    { callDurationSecs: 142 }
+  )
+  await request.post('/api/agent/post-call', { headers: postCallHeaders, data: postCallBody })
 
   // The "Build It" button should now be visible.
   await expect(page.locator('[data-testid="build-button"]')).toBeVisible({ timeout: 5000 })
