@@ -1,64 +1,55 @@
 # Build Pipeline
 
-The post-call build pipeline takes a completed PR spec and turns it into a draft pull request. This document covers the current state (a simulation stub), the intended real implementation, the complexity gate that guards it, and the SSE event sequence the dashboard consumes.
+The post-call build pipeline takes a completed PR spec and turns it into a draft pull request. This document covers the implementation, the complexity gate that guards it, and the SSE event sequence the dashboard consumes.
 
 ---
 
-## Current state
+## Implementation
 
-The build route at [src/app/api/sessions/[id]/build/route.ts](../src/app/api/sessions/%5Bid%5D/build/route.ts) currently calls `simulateBuild()` — three phases with 1.5s delays, ending in a placeholder PR URL. **This is not the final design.**
+The build route at [src/app/api/sessions/[id]/build/route.ts](../src/app/api/sessions/%5Bid%5D/build/route.ts) calls `executeBuild()` from `src/lib/build/executor.ts`. The `simulateBuild` stub has been removed.
 
-```typescript
-// Current stub — do not treat as final
-async function simulateBuild(sessionId: string) {
-  const phases = [
-    { phase: 'analyzing', detail: 'Parsing spec decisions and identifying affected modules' },
-    { phase: 'writing',   detail: 'Generating implementation scaffold' },
-    { phase: 'reviewing', detail: 'Running static checks' },
-  ]
-  for (const { phase, detail } of phases) {
-    await new Promise(r => setTimeout(r, 1500))
-    sessionStore.broadcastEvent(sessionId, { type: 'build_progress', phase, detail })
-  }
-  const prUrl = 'https://github.com/placeholder/pr/1'
-  sessionStore.updateSession(sessionId, { prUrl, buildStatus: 'complete' })
-  sessionStore.broadcastEvent(sessionId, { type: 'build_complete', sessionId, prUrl })
-}
-```
+### Orchestration sequence
 
-The complexity gate, route guards, and SSE event sequence are all fully implemented. Only the actual code generation is stubbed.
+Guards run in this order, each emitting `build_failed` on failure:
 
----
-
-## Intended implementation
-
-The real pipeline will replace `simulateBuild()` with a Claude Code CLI invocation:
-
-```bash
-claude -p "<spec prompt>" \
-  --output-format stream-json \
-  --allowedTools "Read,Write,Edit,Bash(git *),Bash(npm test *),Bash(npx *)" \
-  --max-turns 30
-```
-
-The full sequence:
-
-1. **Clone** the target repo to a temp directory (`fs.mkdtemp(os.tmpdir())`)
-2. **Run Claude Code** in headless mode with the spec as the prompt, streaming `stream-json` output
-3. **Parse** the streamed output, mapping Claude Code phases to `BuildPhase` values for SSE progress events
-4. **Run tests** via the allowed `Bash(npm test *)` tool — abort and emit `build_failed` if they fail
-5. **Commit** the changes and push to a new branch (`spec-voice/<slugified-first-decision>`)
-6. **Open a draft PR** via Octokit
-7. **Clean up** the temp directory in a `finally` block — always, even on failure
-
-**Constraints (from `CLAUDE.md`):**
-- Always clone into `os.tmpdir()`, never into the project directory
-- Always clean up in `finally`, even on error
-- Use Claude Code CLI (`claude -p`), not the Anthropic API directly
-- Branch naming: `spec-voice/<slugified-first-decision>`
-- Draft PR via Octokit — not the GitHub CLI
+1. **Prerequisites** — `claude --version` must succeed; `ANTHROPIC_API_KEY` and `GITHUB_TOKEN` must be set
+2. **Repo URL check** — sessions with only `repoLocalPath` (no `repoUrl`) fast-fail: `"Session has no repository URL."`
+3. **Clone** — `cloneRepo(session.repoUrl)` into `os.tmpdir()`; cleaned up in `finally`
+4. **Write build inputs** — `writeBuildFiles(dir, session)` writes `SPEC.md` (raw spec) and `CONTEXT.md` (decisions + transcript) into the clone dir, and appends both to `.gitignore` so they don't appear in the PR diff
+5. **Claude Code CLI** — spawned in headless mode (see below); `tool_use` events in the NDJSON output are mapped to SSE `build_progress` events
+6. **Draft PR** — `createDraftPR()` via Octokit; sets `buildStatus: 'complete'` and broadcasts `build_complete { prUrl }`
 
 This is post-call only. The pipeline is never triggered during an active voice conversation.
+
+### Claude Code invocation
+
+```bash
+claude -p "<prompt>" \
+  --output-format stream-json \
+  --verbose \
+  --allowedTools "Read,Write,Edit,Bash(git *),Bash(npm test *),Bash(npx *)" \
+  --max-turns 300
+```
+
+Spawned with `stdio: ['ignore', 'pipe', 'pipe']` — stdout piped for NDJSON parsing; stderr drained line-by-line (avoids 64KB buffer deadlock) and included in error messages on non-zero exit. Git identity injected via `GIT_AUTHOR_NAME/EMAIL` and `GIT_COMMITTER_NAME/EMAIL` env vars.
+
+The prompt instructs Claude Code to: read `SPEC.md` and `CONTEXT.md`, checkout a new branch, implement changes, run tests, fix failures, commit, and push. The PR is opened by `createDraftPR()` after `runClaudeCode()` resolves — not by Claude Code itself.
+
+### Branch naming
+
+`spec-voice/<slugified-first-decision-summary>` or `spec-voice/<session-id[:8]>` if no decisions.
+
+### Phase mapping
+
+Each `tool_use` block in the NDJSON output emits a `build_progress` SSE event. Phase derived by `phaseFromTool(name)`:
+
+| Tools | Phase |
+|---|---|
+| `Read, Glob, Grep` | `'analyzing'` |
+| `Write, Edit, MultiEdit, NotebookEdit` | `'writing'` |
+| everything else | `'reviewing'` |
+
+Cloning and PR creation emit `'cloning'` and `'pr'` directly.
 
 ---
 
@@ -171,6 +162,6 @@ The `session_updated` event always carries the authoritative state. `build_compl
 |---|---|
 | `setBuildStatus('error')` | `setBuildStatus('failed')` — `'error'` is not in `BuildStatus` |
 | `buildStatus = 'idle'` after a complexity block | `buildStatus = 'ready'` — the spec still exists |
-| Treat `simulateBuild` as the final design | It's a stub. The real implementation clones the repo and runs Claude Code CLI |
+| Call the Anthropic API directly for code generation | Use `claude -p ... --output-format stream-json` CLI — never import `anthropic` in the build path |
 | Call the Anthropic API directly for code generation | Use `claude -p` CLI in headless mode |
 | Skip the `finally` cleanup for the temp dir | Always clean up — failed clones leave large directories in `os.tmpdir()` |
