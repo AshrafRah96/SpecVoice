@@ -4,8 +4,6 @@ import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
 import { sessionStore } from '@/lib/session/store'
 import { env } from '@/lib/env'
 
-const elevenlabs = new ElevenLabsClient({ apiKey: env.ELEVENLABS_API_KEY })
-
 const TranscriptTurnSchema = z
   .object({
     role: z.string(),
@@ -42,6 +40,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Verify webhook signature when secret is configured.
   // constructEvent also parses the JSON, so we use its output directly.
   if (env.ELEVENLABS_WEBHOOK_SECRET) {
+    const elevenlabs = new ElevenLabsClient({ apiKey: env.ELEVENLABS_API_KEY ?? '' })
     const sigHeader = req.headers.get('ElevenLabs-Signature')
     try {
       await elevenlabs.webhooks.constructEvent(rawBody, sigHeader ?? '', env.ELEVENLABS_WEBHOOK_SECRET)

@@ -12,6 +12,52 @@ The full flow takes about 10–15 minutes for a real feature conversation.
 
 ---
 
+## Setting up ngrok
+
+ElevenLabs tool webhooks call back to your server during a live call. `localhost:3000` is not reachable from ElevenLabs' servers, so you need a public tunnel.
+
+**1. Install ngrok**
+
+```bash
+npm install -g ngrok
+```
+
+Or download from [ngrok.com/download](https://ngrok.com/download) and add it to your PATH.
+
+**2. Authenticate** (one-time, free account required)
+
+```bash
+ngrok config add-authtoken YOUR_AUTH_TOKEN
+```
+
+Get your token at [dashboard.ngrok.com/authtokens](https://dashboard.ngrok.com/authtokens).
+
+**3. Start the tunnel**
+
+```bash
+ngrok http 3000
+```
+
+Copy the `Forwarding` URL — it looks like `https://abc123.ngrok-free.app`.
+
+**4. Update `.env.local`**
+
+```
+NEXT_PUBLIC_APP_URL=https://abc123.ngrok-free.app
+```
+
+**5. Re-sync the agent** (required whenever the URL changes)
+
+```bash
+npx tsx src/scripts/setup-agent.ts
+```
+
+This updates the tool webhook URLs registered in ElevenLabs to point at your new tunnel.
+
+> **Note:** Free ngrok URLs change every time you restart the tunnel. Re-run steps 3–5 each session. A paid ngrok plan gives you a static domain so you only do this once.
+
+---
+
 ## Before you start
 
 Check these or the call will fail silently:
@@ -120,8 +166,6 @@ The build runs asynchronously. The right panel switches to **BuildProgress** and
 | `cloning` | Cloning repo to temp dir |
 | `pr` | Creating draft PR via GitHub API |
 
-> **Note:** The current build pipeline is a simulation stub (3 × 1.5s phases). The real Claude Code CLI integration isn't implemented yet. See [Build Pipeline](./build-pipeline.md) for the intended design.
-
 When complete, the PR URL appears in the panel.
 
 ---
@@ -133,6 +177,6 @@ When complete, the PR URL appears in the panel.
 | Spec tab never appears | `generate_spec` webhook didn't fire | Ask the agent explicitly: "please generate the spec now" |
 | Build blocked immediately | Open questions in the session | Resolve them by continuing the conversation, then rebuild |
 | Build blocked: `too_large` | Agent read ≥ 100 files | Narrow scope — the spec's split suggestion shows how to break it up |
-| PR URL is a placeholder | Build pipeline is the simulation stub | Expected — real integration is pending |
+| Build stuck in `analyzing` for > 5 min | Claude Code CLI running a complex spec | Check server logs; kill and retry with a narrower scope |
 
 For webhook and audio issues, see [README Troubleshooting](../README.md#troubleshooting).
