@@ -17,12 +17,11 @@ Browser tab
 
 ElevenLabs Agent (Claude LLM + voice)
   └─ during the call, calls tool webhooks:
-       POST /api/tools/list-files
-       POST /api/tools/read-file
-       POST /api/tools/search-code
-       POST /api/tools/save-decision
-       POST /api/tools/flag-question
-       POST /api/tools/generate-spec
+       POST /api/tools/{name}   → src/app/api/tools/[name]/route.ts
+                                → toolRegistry.dispatch(name, req)
+                                → src/lib/api/tool-registry.ts
+       (tool names: list-files, read-file, search-code,
+        save-decision, flag-question, generate-spec)
 
 ElevenLabs platform (after the call)
   └─ POST /api/agent/post-call   → transitions session to buildStatus: 'ready'
@@ -94,7 +93,15 @@ This is unintuitive when you first read the docs (the REST API reference implies
 - `setup-agent.ts` does an idempotent upsert: creates tools if they don't exist, updates them if they do, then updates the agent with the full `toolIds` list
 - `toolIds` is always a complete replacement, not a merge — passing a partial list silently removes the omitted tools
 
-The tool webhook routes live exclusively in `src/app/api/tools/`. The tool definitions (names, descriptions, parameter schemas) live in `src/lib/agent/tool-definitions.ts`. Never put tool logic anywhere else.
+Tool routing uses a single dynamic route — `src/app/api/tools/[name]/route.ts` — that reads the `name` path segment and calls `toolRegistry.dispatch(name, req)`. The registry is defined in `src/lib/api/tool-registry.ts`, which registers one handler per tool name and delegates shared session-lookup and Zod validation to `src/lib/api/tool-handler.ts`.
+
+Three distinct responsibilities:
+
+- **ElevenLabs tool config** (webhook URL, description, parameter schema as sent to ElevenLabs): `src/lib/agent/tool-definitions.ts`
+- **Server handler logic** (session lookup, validation, side effects): `src/lib/api/tool-registry.ts`
+- **Route dispatch** (thin adapter — reads `name`, calls registry): `src/app/api/tools/[name]/route.ts`
+
+Never put handler logic in the route file, and never put ElevenLabs schema config in the registry.
 
 ---
 
