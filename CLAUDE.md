@@ -27,7 +27,7 @@ Next.js 14+ App Router. TypeScript. @elevenlabs/elevenlabs-js for voice + Twilio
 ## Architecture Rules
 
 - IMPORTANT: No vector database, no embeddings, no RAG. Agent tools give Claude file access on demand; Claude reasons about code natively.
-- IMPORTANT: Agent tools are webhooks. ElevenLabs calls our API routes at src/app/api/tools/. Never put tool logic anywhere else.
+- IMPORTANT: Agent tools are webhooks. Tool routing uses a single dynamic route at `src/app/api/tools/[name]/route.ts` that dispatches to the registry. Three-way split: ElevenLabs tool config (webhook URL, description, parameter schema) lives in `src/lib/agent/tool-definitions.ts`; server handler logic lives in `src/lib/api/tool-registry.ts`; the route file is a thin dispatcher only. Never put handler logic in the route file.
 - IMPORTANT: Dashboard uses Server-Sent Events, NOT WebSockets. Next.js App Router does not support WebSocket upgrade. See src/app/api/sessions/[id]/events/route.ts.
 - IMPORTANT: Claude runs as the LLM inside the ElevenLabs agent config, not via direct Anthropic API calls during a call. The one exception is the post-call build pipeline, which uses Claude Code CLI (`claude -p --output-format stream-json`).
 - IMPORTANT: The build pipeline runs post-call only. Never trigger code generation during a voice conversation.
@@ -50,7 +50,7 @@ Next.js 14+ App Router. TypeScript. @elevenlabs/elevenlabs-js for voice + Twilio
 - File reads are capped at 4000 characters. Always record a FileRead entry in the session when reading a file.
 - CodeSource has two implementations (GitHub via Octokit, local via fs). Resolve from session state using src/lib/code/index.ts. Never instantiate directly in route handlers.
 - The SessionStore singleton and per-session CodeSource cache both live on `globalThis` (not a module variable) so they survive Next.js hot reloads. Follow this same pattern for any future process-level singletons.
-- The build pipeline in `src/app/api/sessions/[id]/build/route.ts` is currently a simulation stub (3 × 1.5s phases). The real Claude Code CLI integration is not yet implemented. Do not treat the stub as the final design.
+- The build pipeline (`src/app/api/sessions/[id]/build/route.ts`) is fully implemented. It calls `executeBuild()` in `src/lib/build/executor.ts`, which: checks prerequisites (`claude --version`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`), clones the repo into `os.tmpdir()`, writes `SPEC.md` + `CONTEXT.md`, runs Claude Code CLI (`claude -p --output-format stream-json`), and opens a draft PR via Octokit. There is no simulation stub.
 - Tool webhooks receive the session ID via `conversation_initiation_client_data.dynamic_variables.session_id` (injected when the call starts). This is the only routing key; all tool routes resolve the session from it before doing any work.
 
 ## ElevenLabs
