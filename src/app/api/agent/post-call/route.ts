@@ -74,21 +74,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ignored: 'unknown session' }, { status: 200 })
   }
 
-  // Single updateSession call = single session_updated broadcast.
-  sessionStore.updateSession(sessionId, {
-    status: 'complete',
-    callDurationSecs: data.metadata.call_duration_secs,
-    transcript: JSON.stringify(data.transcript),
-    buildStatus: 'ready',
-  })
-
-  // Dedicated call_ended event so dashboard consumers know the call finished
-  // without having to diff session state.
-  sessionStore.broadcastEvent(sessionId, {
-    type: 'call_ended',
+  sessionStore.endCall(
     sessionId,
-    callDurationSecs: data.metadata.call_duration_secs,
-  })
+    data.metadata.call_duration_secs,
+    JSON.stringify(data.transcript)
+  )
 
   return NextResponse.json({ received: true }, { status: 200 })
 }
