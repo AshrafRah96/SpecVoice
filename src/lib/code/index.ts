@@ -2,29 +2,32 @@ import type { Session } from '@/lib/session/types'
 import type { CodeSource } from '@/lib/code/types'
 import { GitHubCodeSource } from '@/lib/code/github-source'
 import { LocalCodeSource } from '@/lib/code/local-source'
-// Cache per session.id — attached to globalThis so it survives Next.js hot reloads
-// and is shared across route module contexts (same fix as sessionStore).
-const g = globalThis as unknown as { __sourceCache?: Map<string, CodeSource> }
-if (!g.__sourceCache) g.__sourceCache = new Map()
-const sourceCache = g.__sourceCache
+import { InMemoryCodeSource } from '@/lib/code/in-memory-source'
+import { createHotReloadSafeSingleton } from '@/lib/singleton'
+
+export { InMemoryCodeSource }
+
+const codeSourceRegistry = createHotReloadSafeSingleton(
+  '__codeSourceRegistry',
+  () => new Map<string, CodeSource>()
+)
+
+export function registerCodeSource(sessionId: string, source: CodeSource): () => void {
+  codeSourceRegistry.set(sessionId, source)
+  return () => codeSourceRegistry.delete(sessionId)
+}
 
 export function resolveCodeSource(session: Session): CodeSource {
-  const cached = sourceCache.get(session.id)
-  if (cached) return cached
-
-  let source: CodeSource
-
+  const override = codeSourceRegistry.get(session.id)
+  if (override) return override
   if (session.repoUrl) {
-    source = new GitHubCodeSource(session.repoUrl, process.env.GITHUB_TOKEN)
-  } else if (session.repoLocalPath) {
-    source = new LocalCodeSource(session.repoLocalPath)
-  } else {
-    throw new Error(
-      `Session ${session.id} has no code source configured. ` +
-        'Set repoUrl or repoLocalPath when creating the session via POST /api/sessions.'
-    )
+    return new GitHubCodeSource(session.repoUrl, process.env.GITHUB_TOKEN)
   }
-
-  sourceCache.set(session.id, source)
-  return source
+  if (session.repoLocalPath) {
+    return new LocalCodeSource(session.repoLocalPath)
+  }
+  throw new Error(
+    `Session ${session.id} has no code source configured. ` +
+      'Set repoUrl or repoLocalPath when creating the session via POST /api/sessions.'
+  )
 }

@@ -1,13 +1,5 @@
 import { Octokit } from '@octokit/rest'
-
-function parseOwnerRepo(repoUrl: string): { owner: string; repo: string } {
-  const url = repoUrl.trim().replace(/\/$/, '').replace(/\.git$/, '')
-  const match = url.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)$/)
-  if (match) return { owner: match[1], repo: match[2] }
-  throw new Error(
-    `Unrecognised GitHub repo URL: ${repoUrl}. Expected 'https://github.com/owner/repo'.`
-  )
-}
+import { parseOwnerRepo } from '@/lib/github/utils'
 
 export async function createDraftPR(opts: {
   repoUrl: string
@@ -15,10 +7,9 @@ export async function createDraftPR(opts: {
   sessionId: string
   specOutput: string
   firstDecisionSummary?: string
+  token?: string
 }): Promise<string> {
-  // Read token from process.env directly — GITHUB_TOKEN is optional in the env
-  // schema, so importing the `env` singleton would throw in test contexts.
-  const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN })
+  const octokit = new Octokit({ auth: opts.token ?? process.env.GITHUB_TOKEN })
   const { owner, repo } = parseOwnerRepo(opts.repoUrl)
 
   const { data: repoData } = await octokit.repos.get({ owner, repo })

@@ -3,20 +3,16 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 
-/**
- * Clone `repoUrl` into a new temp directory. Async so the event loop stays
- * responsive during the clone — spawnSync would block all incoming requests.
- * Injects GITHUB_TOKEN into the URL if set (required for private repos and push).
- * Reads GITHUB_TOKEN from process.env directly — it is optional in the validated
- * env schema, so importing the `env` singleton (which validates ELEVENLABS_API_KEY)
- * would throw in non-Next.js contexts like tests and the Claude Code subprocess.
- */
-export async function cloneRepo(repoUrl: string): Promise<string> {
+export function injectTokenIntoUrl(repoUrl: string, token: string | undefined): string {
+  if (!token) return repoUrl
+  if (!repoUrl.startsWith('https://')) return repoUrl
+  return repoUrl.replace('https://', `https://oauth2:${token}@`)
+}
+
+export async function cloneRepo(repoUrl: string, token?: string): Promise<string> {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'specvoice-'))
-  const token = process.env.GITHUB_TOKEN
-  const authedUrl = token
-    ? repoUrl.replace('https://', `https://oauth2:${token}@`)
-    : repoUrl
+  const resolvedToken = token ?? process.env.GITHUB_TOKEN
+  const authedUrl = injectTokenIntoUrl(repoUrl, resolvedToken)
   return new Promise((resolve, reject) => {
     const proc = spawn('git', ['clone', '--depth', '1', authedUrl, tmpDir], {
       stdio: ['ignore', 'pipe', 'pipe'],

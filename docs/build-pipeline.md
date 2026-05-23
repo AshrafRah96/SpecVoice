@@ -162,6 +162,5 @@ The `session_updated` event always carries the authoritative state. `build_compl
 |---|---|
 | `setBuildStatus('error')` | `setBuildStatus('failed')` — `'error'` is not in `BuildStatus` |
 | `buildStatus = 'idle'` after a complexity block | `buildStatus = 'ready'` — the spec still exists |
-| Call the Anthropic API directly for code generation | Use `claude -p ... --output-format stream-json` CLI — never import `anthropic` in the build path |
-| Call the Anthropic API directly for code generation | Use `claude -p` CLI in headless mode |
+| Call the Anthropic API directly for code generation | Use `claude -p ... --output-format stream-json` CLI in headless mode — never import `anthropic` in the build path |
 | Skip the `finally` cleanup for the temp dir | Always clean up — failed clones leave large directories in `os.tmpdir()` |

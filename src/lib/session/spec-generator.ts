@@ -1,20 +1,36 @@
 import type { Session, Decision } from '@/lib/session/types'
 
-const EDGE_CASE_KEYWORDS = ['error', 'fail', 'edge', 'exception', 'timeout', 'retry']
-const SCOPE_KEYWORDS = ['scope', 'v1', 'out of scope', 'later', 'separate pr', 'phase']
-
-function categorizeDecision(decision: Decision): 'edge' | 'scope' | 'core' {
-  const lower = decision.summary.toLowerCase()
-  if (EDGE_CASE_KEYWORDS.some(k => lower.includes(k))) return 'edge'
-  if (SCOPE_KEYWORDS.some(k => lower.includes(k))) return 'scope'
-  return 'core'
+export interface DecisionClassifier {
+  readonly category: 'edge' | 'scope'
+  matches(decision: Decision): boolean
 }
 
-function escapeCell(value: string): string {
+export const classifiers: DecisionClassifier[] = [
+  {
+    category: 'edge',
+    matches: (d) => {
+      const lower = d.summary.toLowerCase()
+      return ['error', 'fail', 'edge', 'exception', 'timeout', 'retry'].some(k => lower.includes(k))
+    },
+  },
+  {
+    category: 'scope',
+    matches: (d) => {
+      const lower = d.summary.toLowerCase()
+      return ['scope', 'v1', 'out of scope', 'later', 'separate pr', 'phase'].some(k => lower.includes(k))
+    },
+  },
+]
+
+export function categorizeDecision(decision: Decision): 'edge' | 'scope' | 'core' {
+  return classifiers.find(c => c.matches(decision))?.category ?? 'core'
+}
+
+export function escapeCell(value: string): string {
   return value.replace(/\|/g, '\\|').replace(/\n/g, ' ')
 }
 
-function decisionsTable(decisions: Decision[]): string {
+export function decisionsTable(decisions: Decision[]): string {
   if (decisions.length === 0) return '_None recorded._\n'
   const header = '| Decision | Rationale | Alternatives Considered |\n|---|---|---|\n'
   const rows = decisions

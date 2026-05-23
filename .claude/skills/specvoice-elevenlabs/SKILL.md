@@ -149,7 +149,7 @@ const toolConfig: ToolRequestModel = {
 }
 ```
 
-Tool webhook routes live in `src/app/api/tools/`. ElevenLabs calls these during conversations. All routes receive `session_id` in the body and use it to look up the session.
+Tool webhook routes are dispatched via a single dynamic route: `src/app/api/tools/[name]/route.ts` → `toolRegistry.dispatch(name, req)` in `src/lib/api/tool-registry.ts`. The ElevenLabs-facing URLs remain `/api/tools/{name}` (e.g. `/api/tools/read-file`). All handlers receive `session_id` in the body and use it to look up the session.
 
 ---
 
