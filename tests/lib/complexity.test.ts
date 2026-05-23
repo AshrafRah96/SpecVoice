@@ -1,24 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { assessComplexity } from '@/lib/session/complexity'
-import type { Session } from '@/lib/session/types'
-
-function makeSession(overrides: Partial<Session> = {}): Session {
-  return {
-    id: 'test-id',
-    decisions: [],
-    openQuestions: [],
-    filesRead: [],
-    status: 'active',
-    callDurationSecs: null,
-    transcript: null,
-    buildStatus: 'idle',
-    prUrl: null,
-    complexityAssessment: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    ...overrides,
-  }
-}
+import { assessComplexity, charCountEstimator } from '@/lib/session/complexity'
+import { makeSession } from '../fixtures'
 
 describe('assessComplexity', () => {
   it('small session with no questions is not blocked', () => {
@@ -75,6 +57,48 @@ describe('assessComplexity', () => {
     })
     const result = assessComplexity(session)
     expect(result.blockReason).toBe('open_questions')
+  })
+
+  it('injected estimator returning large value makes session too_large', () => {
+    const session = makeSession({ filesRead: [{ path: 'src/a.ts', timestamp: '', characterCount: 1 }] })
+    const result = assessComplexity(session, () => 99999)
+    expect(result.size).toBe('too_large')
+    expect(result.blocked).toBe(true)
+    expect(result.blockReason).toBe('too_large')
+  })
+
+  it('injected estimator returning small value keeps session small', () => {
+    const filesRead = Array.from({ length: 200 }, (_, i) => ({
+      path: `src/file${i}.ts`, timestamp: '', characterCount: 10000,
+    }))
+    const session = makeSession({ filesRead })
+    const result = assessComplexity(session, () => 1)
+    expect(result.size).toBe('small')
+    expect(result.blocked).toBe(false)
+  })
+
+  it('charCountEstimator converts total chars to estimated lines (÷80)', () => {
+    const session = makeSession({
+      filesRead: [
+        { path: 'a.ts', timestamp: '', characterCount: 50000 },
+        { path: 'b.ts', timestamp: '', characterCount: 50000 },
+      ],
+    })
+    const result = assessComplexity(session, charCountEstimator)
+    expect(result.lineEstimate).toBe(1250) // 100000 / 80
+    expect(result.size).toBe('medium')
+  })
+
+  it('charCountEstimator correctly classifies many tiny files as small', () => {
+    const filesRead = Array.from({ length: 101 }, (_, i) => ({
+      path: `config/file${i}.json`, timestamp: '', characterCount: 10,
+    }))
+    const session = makeSession({ filesRead })
+    // filecountEstimator: 101 * 50 = 5050 → too_large
+    // charCountEstimator: (101 * 10) / 80 ≈ 13 → small
+    const result = assessComplexity(session, charCountEstimator)
+    expect(result.size).toBe('small')
+    expect(result.blocked).toBe(false)
   })
 
   it('splitSuggestion groups relevantFiles by top-level directory when too_large', () => {

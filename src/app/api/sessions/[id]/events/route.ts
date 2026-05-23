@@ -28,7 +28,7 @@ export async function GET(
 
   request.signal.addEventListener('abort', () => {
     unsubscribe()
-    writer.close()
+    writer.close().catch(() => {})
   })
 
   return new Response(readable, {
