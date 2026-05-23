@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sessionStore } from '@/lib/session/store'
 import { sessionNotFound } from '@/lib/api/helpers'
-import { assessComplexity } from '@/lib/session/complexity'
-import { executeBuild } from '@/lib/build'
+import { BuildPipeline } from '@/lib/build/pipeline'
+
+const pipeline = new BuildPipeline()
 
 export async function POST(
   _request: NextRequest,
@@ -23,30 +24,9 @@ export async function POST(
     return NextResponse.json({ error: 'No spec to build from.' }, { status: 400 })
   }
 
-  sessionStore.setBuildStatus(id, 'building')
-  sessionStore.broadcastEvent(id, { type: 'build_started', sessionId: id })
+  sessionStore.startBuild(id)
 
-  void runGatedBuild(id)
+  void pipeline.run(id)
 
   return NextResponse.json({ accepted: true }, { status: 202 })
-}
-
-async function runGatedBuild(sessionId: string) {
-  const session = sessionStore.getSession(sessionId)
-  if (!session) return
-
-  const assessment = assessComplexity(session)
-  sessionStore.setComplexityAssessment(sessionId, assessment)
-
-  if (assessment.blocked) {
-    sessionStore.setBuildStatus(sessionId, 'ready')
-    sessionStore.broadcastEvent(sessionId, {
-      type: 'build_blocked',
-      sessionId,
-      assessment,
-    })
-    return
-  }
-
-  await executeBuild(sessionId)
 }

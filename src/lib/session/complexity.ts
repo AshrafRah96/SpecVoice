@@ -1,5 +1,14 @@
 import type { Session, ComplexityAssessment } from '@/lib/session/types'
 
+export type SizeEstimator = (session: Session) => number
+
+export const filecountEstimator: SizeEstimator = (session) => session.filesRead.length * 50
+
+const CHARS_PER_LINE = 80
+
+export const charCountEstimator: SizeEstimator = (session) =>
+  Math.ceil(session.filesRead.reduce((sum, f) => sum + f.characterCount, 0) / CHARS_PER_LINE)
+
 const SIZE_THRESHOLDS = {
   small: 500,
   medium: 2000,
@@ -25,10 +34,13 @@ function groupByTopLevelDir(paths: string[]): string[][] {
   return Array.from(groups.values())
 }
 
-export function assessComplexity(session: Session): ComplexityAssessment {
+export function assessComplexity(
+  session: Session,
+  estimator: SizeEstimator = filecountEstimator
+): ComplexityAssessment {
   const fileCount = session.filesRead.length
   const openQuestionCount = session.openQuestions.length
-  const lineEstimate = fileCount * 50
+  const lineEstimate = estimator(session)
   const size = sizeFromLineEstimate(lineEstimate)
 
   const tooLarge = size === 'too_large'

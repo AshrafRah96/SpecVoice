@@ -23,14 +23,15 @@ describe('POST /api/sessions/[id]/build', () => {
   })
 
   it('returns 409 when build already in progress', async () => {
-    const session = sessionStore.createSession({ specOutput: '# Spec\n- step 1' })
-    sessionStore.setBuildStatus(session.id, 'building')
+    // Create directly in 'building' state to bypass the state machine guard —
+    // we're testing the HTTP-level idempotency check, not a valid transition.
+    const session = sessionStore.createSession({ specOutput: '# Spec\n- step 1', buildStatus: 'building' })
     const res = await POST(makeRequest(session.id), { params: { id: session.id } })
     expect(res.status).toBe(409)
   })
 
   it('returns 202 and accepts build when session has a spec', async () => {
-    const session = sessionStore.createSession({ specOutput: '# Spec\n- step 1' })
+    const session = sessionStore.createSession({ specOutput: '# Spec\n- step 1', buildStatus: 'ready' })
     const res = await POST(makeRequest(session.id), { params: { id: session.id } })
     expect(res.status).toBe(202)
     expect(await res.json()).toEqual({ accepted: true })
@@ -39,6 +40,7 @@ describe('POST /api/sessions/[id]/build', () => {
   it('fires build_blocked and resets buildStatus to ready when open questions exist', async () => {
     const session = sessionStore.createSession({
       specOutput: '# Spec content',
+      buildStatus: 'ready',
       openQuestions: [
         { id: 'q1', question: 'Migrate?', context: 'context', timestamp: new Date().toISOString() },
       ],
