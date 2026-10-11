@@ -4,13 +4,19 @@ import {
   ToolRequestModel,
 } from '@elevenlabs/elevenlabs-js/api'
 
-// session_id is injected as a dynamic variable by the frontend when starting a conversation.
+// session_id and session_token are injected as dynamic variables by the frontend when starting a conversation.
 // It is passed in the body of every webhook call so route handlers can look up the session.
 // dynamicVariable is an ElevenLabs-specific extension to JSON Schema — not part of the spec,
 // but required for runtime variable injection into webhook tool calls.
 const SESSION_ID_PROP = {
   type: LiteralJsonSchemaPropertyType.String,
   dynamicVariable: 'session_id',
+} as const
+
+const SESSION_TOKEN_PROP = {
+  type: LiteralJsonSchemaPropertyType.String,
+  dynamicVariable: 'session_token',
+  description: 'Short-lived capability issued when the session is created.',
 } as const
 
 // Builds the webhook tool configs for use with conversationalAi.tools.create().
@@ -31,9 +37,10 @@ export function buildToolConfigs(appUrl: string): ToolRequestModel[] {
           method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
             type: 'object' as const,
-            required: ['session_id'],
+            required: ['session_id', 'session_token'],
             properties: {
               session_id: SESSION_ID_PROP,
+              session_token: SESSION_TOKEN_PROP,
               path: {
                 type: LiteralJsonSchemaPropertyType.String,
                 description: 'Subdirectory path to list. Omit for the repository root.',
@@ -54,9 +61,10 @@ export function buildToolConfigs(appUrl: string): ToolRequestModel[] {
           method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
             type: 'object' as const,
-            required: ['session_id', 'path'],
+            required: ['session_id', 'session_token', 'path'],
             properties: {
               session_id: SESSION_ID_PROP,
+              session_token: SESSION_TOKEN_PROP,
               path: {
                 type: LiteralJsonSchemaPropertyType.String,
                 description: 'File path relative to the repository root.',
@@ -85,9 +93,10 @@ export function buildToolConfigs(appUrl: string): ToolRequestModel[] {
           method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
             type: 'object' as const,
-            required: ['session_id', 'query'],
+            required: ['session_id', 'session_token', 'query'],
             properties: {
               session_id: SESSION_ID_PROP,
+              session_token: SESSION_TOKEN_PROP,
               query: {
                 type: LiteralJsonSchemaPropertyType.String,
                 description: 'Search string to look for across the codebase.',
@@ -112,9 +121,17 @@ export function buildToolConfigs(appUrl: string): ToolRequestModel[] {
           method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
             type: 'object' as const,
-            required: ['session_id', 'summary', 'rationale', 'alternatives_considered', 'relevant_files'],
+            required: [
+              'session_id',
+              'session_token',
+              'summary',
+              'rationale',
+              'alternatives_considered',
+              'relevant_files',
+            ],
             properties: {
               session_id: SESSION_ID_PROP,
+              session_token: SESSION_TOKEN_PROP,
               summary: {
                 type: LiteralJsonSchemaPropertyType.String,
                 description: 'What was decided.',
@@ -155,9 +172,10 @@ export function buildToolConfigs(appUrl: string): ToolRequestModel[] {
           method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
             type: 'object' as const,
-            required: ['session_id', 'question', 'context'],
+            required: ['session_id', 'session_token', 'question', 'context'],
             properties: {
               session_id: SESSION_ID_PROP,
+              session_token: SESSION_TOKEN_PROP,
               question: {
                 type: LiteralJsonSchemaPropertyType.String,
                 description: 'The unresolved question.',
@@ -182,9 +200,10 @@ export function buildToolConfigs(appUrl: string): ToolRequestModel[] {
           method: WebhookToolApiSchemaConfigInputMethod.Post,
           requestBodySchema: {
             type: 'object' as const,
-            required: ['session_id'],
+            required: ['session_id', 'session_token'],
             properties: {
               session_id: SESSION_ID_PROP,
+              session_token: SESSION_TOKEN_PROP,
             },
           },
         },

@@ -2,22 +2,25 @@
 
 The post-call build pipeline takes a completed PR spec and turns it into a draft pull request. This document covers the implementation, the complexity gate that guards it, and the SSE event sequence the dashboard consumes.
 
+The build route requires the session capability and an `Idempotency-Key`. `SessionStore.tryStartBuild()` atomically accepts the first key, replays the same key, and rejects a competing key while a build is running. This prevents double branch pushes and duplicate draft pull requests within the single-process deployment boundary.
+
 ---
 
 ## Implementation
 
-The build route at [src/app/api/sessions/[id]/build/route.ts](../src/app/api/sessions/%5Bid%5D/build/route.ts) calls `executeBuild()` from `src/lib/build/executor.ts`. The `simulateBuild` stub has been removed.
+The build route at [src/app/api/sessions/[id]/build/route.ts](../src/app/api/sessions/%5Bid%5D/build/route.ts) starts `BuildPipeline.run()` from `src/lib/build/pipeline.ts` in the background.
 
 ### Orchestration sequence
 
-Guards run in this order, each emitting `build_failed` on failure:
+Validation and execution run in this order:
 
-1. **Prerequisites** — `claude --version` must succeed; `ANTHROPIC_API_KEY` and `GITHUB_TOKEN` must be set
-2. **Repo URL check** — sessions with only `repoLocalPath` (no `repoUrl`) fast-fail: `"Session has no repository URL."`
-3. **Clone** — `cloneRepo(session.repoUrl)` into `os.tmpdir()`; cleaned up in `finally`
-4. **Write build inputs** — `writeBuildFiles(dir, session)` writes `SPEC.md` (raw spec) and `CONTEXT.md` (decisions + transcript) into the clone dir, and appends both to `.gitignore` so they don't appear in the PR diff
-5. **Claude Code CLI** — spawned in headless mode (see below); `tool_use` events in the NDJSON output are mapped to SSE `build_progress` events
-6. **Draft PR** — `createDraftPR()` via Octokit; sets `buildStatus: 'complete'` and broadcasts `build_complete { prUrl }`
+1. **Complexity** — `validateBuild()` assesses file count and open questions. A blocked assessment emits `build_blocked`.
+2. **Prerequisites** — `claude --version`, `ANTHROPIC_API_KEY`, and `GITHUB_TOKEN` must be available. Failures emit `build_failed`.
+3. **Repo URL** — sessions with only `repoLocalPath` fast-fail with `"Session has no repository URL."`
+4. **Clone** — `cloneRepo(session.repoUrl)` into `os.tmpdir()`; cleaned up in `finally`
+5. **Write build inputs** — `writeBuildFiles(dir, session)` writes `SPEC.md` and `CONTEXT.md` into the clone dir, and appends both to `.gitignore`
+6. **Claude Code CLI** — spawned in headless mode (see below); tool-use events map to SSE `build_progress` events
+7. **Draft PR** — `createDraftPR()` via Octokit; sets `buildStatus: 'complete'` and broadcasts `build_complete { prUrl }`
 
 This is post-call only. The pipeline is never triggered during an active voice conversation.
 
@@ -33,7 +36,7 @@ claude -p "<prompt>" \
 
 Spawned with `stdio: ['ignore', 'pipe', 'pipe']` — stdout piped for NDJSON parsing; stderr drained line-by-line (avoids 64KB buffer deadlock) and included in error messages on non-zero exit. Git identity injected via `GIT_AUTHOR_NAME/EMAIL` and `GIT_COMMITTER_NAME/EMAIL` env vars.
 
-The prompt instructs Claude Code to: read `SPEC.md` and `CONTEXT.md`, checkout a new branch, implement changes, run tests, fix failures, commit, and push. The PR is opened by `createDraftPR()` after `runClaudeCode()` resolves — not by Claude Code itself.
+The prompt instructs Claude Code to: read `SPEC.md` and `CONTEXT.md`, checkout a new branch, implement changes, run tests, fix failures, commit, and push. The PR is opened by `createDraftPR()` after the process runner resolves — not by Claude Code itself.
 
 ### Branch naming
 
@@ -55,7 +58,7 @@ Cloning and PR creation emit `'cloning'` and `'pr'` directly.
 
 ## Complexity gate
 
-Before any build work starts, `runGatedBuild()` calls `assessComplexity(session)`. This runs synchronously and may block the build before a single line of code is generated.
+Before execution starts, `validateBuild()` calls `assessComplexity(session)`. This runs synchronously and may block the build before a single line of code is generated.
 
 ### Gate logic
 
@@ -80,10 +83,10 @@ When blocked, `buildStatus` resets to `'ready'` (not `'idle'` — the spec still
 
 ### `splitSuggestion`
 
-Only populated when `blockReason === 'too_large'`. Groups the relevant files from all decisions by top-level directory:
+Only populated when `blockReason === 'too_large'`. Groups decision `relevantFiles` by their first path segment. The gate's `fileCount` still comes from `session.filesRead.length`.
 
 ```typescript
-splitSuggestion = session.decisions.flatMap(d => d.relevantFiles).groupBy(path => path.split('/')[0]) // top-level dir
+splitSuggestion = groupByTopLevelDir(session.decisions.flatMap(d => d.relevantFiles))
 ```
 
 This gives the developer a suggested way to split the spec into smaller, independently buildable pieces.

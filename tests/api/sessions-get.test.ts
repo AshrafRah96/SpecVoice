@@ -3,12 +3,23 @@ import { NextRequest } from 'next/server'
 import { GET as getSession } from '@/app/api/sessions/[id]/route'
 import { GET as getSpec } from '@/app/api/sessions/[id]/spec/route'
 import { sessionStore } from '@/lib/session/store'
+import { issueSessionCapability } from '@/lib/session/capability'
 
 function makeRequest(url: string): NextRequest {
-  return new NextRequest(url)
+  const id =
+    url.split('/').filter(Boolean).at(-1) === 'spec'
+      ? url.split('/').filter(Boolean).at(-2)!
+      : url.split('/').filter(Boolean).at(-1)!
+  return new NextRequest(url, { headers: { Authorization: `Bearer ${issueSessionCapability(id)}` } })
 }
 
 describe('GET /api/sessions/[id]', () => {
+  it('rejects requests without a capability', async () => {
+    const res = await getSession(new NextRequest('http://localhost/api/sessions/no-such'), {
+      params: Promise.resolve({ id: 'no-such' }),
+    })
+    expect(res.status).toBe(401)
+  })
   it('returns 404 for unknown session', async () => {
     const res = await getSession(makeRequest('http://localhost/api/sessions/no-such'), {
       params: Promise.resolve({ id: 'no-such' }),

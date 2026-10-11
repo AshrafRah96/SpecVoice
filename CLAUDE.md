@@ -29,3 +29,4 @@ This is a single-context repo. Read `GLOSSARY.md` and relevant ADRs under `docs/
 - The dashboard uses SSE. The build pipeline runs post-call only and uses the Claude Code CLI boundary recorded in ADR-0002.
 - Clone repositories into `os.tmpdir()` and clean them in `finally`.
 - Use shared types, Zod validation, the existing `globalThis` singleton pattern, and token-based Tailwind colors.
+- Use the global Ponytail skill for implementation discipline; see [Ponytail workflow](./docs/agents/ponytail.md).

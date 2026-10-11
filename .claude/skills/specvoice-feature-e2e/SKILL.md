@@ -1,6 +1,6 @@
 ---
 name: specvoice-feature-e2e
-description: Use when writing, fixing, or extending the SpecVoice E2E test suite — manual HTTP smoke test (Feature 06) or Playwright critical-path test (Feature 07). Also use when adding data-testid attributes, debugging SSE-driven UI assertions, or diagnosing why a Playwright assertion times out without a sleep fix.
+description: Use when writing, fixing, or extending the SpecVoice E2E test suite — manual HTTP smoke test (`docs/testing/manual-smoke.md`) or Playwright critical-path test. Also use when adding data-testid attributes, debugging SSE-driven UI assertions, or diagnosing why a Playwright assertion times out without a sleep fix.
 ---
 
 ## Overview
@@ -14,7 +14,7 @@ Two complementary test layers verify the full SpecVoice data path:
 
 1. `POST /api/sessions` → capture `id`. Expect `buildStatus: 'idle'`.
 2. Open SSE stream: `curl -N .../api/sessions/{id}/events` — keep running for the entire test.
-3. Fire tool webhooks in order. Each must include `conversation_initiation_client_data.dynamic_variables.session_id`:
+3. Fire tool webhooks in order. Each tool request includes root `session_id`; only the post-call webhook uses `data.conversation_initiation_client_data.dynamic_variables.session_id`:
    - Agent names are `list_files`, `read_file`, `search_code`, `save_decision`, `flag_question`, and `generate_spec`.
    - Their webhook paths and registry keys are `list-files`, `read-file`, `search-code`, `save-decision`, `flag-question`, and `generate-spec`.
    - `list_files` / `list-files` — no SSE event (no session mutation).
@@ -24,10 +24,10 @@ Two complementary test layers verify the full SpecVoice data path:
    - `flag_question` / `flag-question` — SSE fires `session_updated` with `openQuestions` populated.
    - `generate_spec` / `generate-spec` — SSE fires `session_updated` with `specOutput` set.
 4. `GET /api/sessions/{id}` — verify all fields populated.
-5. `POST /api/agent/post-call` with correct payload → `{"received": true}`. SSE fires `call_ended` then `session_updated` with `buildStatus: 'ready'`, `callDurationSecs`, `transcript`.
+5. `POST /api/agent/post-call` with correct payload → `{"received": true}`. SSE fires `session_updated` with `buildStatus: 'ready'`, `callDurationSecs`, `transcript`, then `call_ended`.
 6. `POST /api/agent/post-call` with no `session_id` → must return `200 { ignored: '...' }` (graceful no-op, never 4xx).
 7. `POST /api/sessions/{id}/build` → 202. SSE fires `build_started` then `build_blocked` with `blockReason: 'open_questions'` (open question was flagged in step 3). `buildStatus` returns to `'ready'` — the build never started.
-8. `POST /api/sessions/{id}/build` again while building → 409.
+8. Use a fresh session with no open questions. Send a second `POST /api/sessions/{id}/build` while the first build is still running → 409.
 
 ### Correct post-call webhook payload shape
 

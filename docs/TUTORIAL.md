@@ -85,7 +85,7 @@ Or, for local repos, paste the absolute path to the directory:
 /Users/you/code/my-project
 ```
 
-Click **Start Session**. The session ID appears below the input — this is the routing key that connects the agent's tool calls back to this browser tab. The SSE status indicator should show **connected** within a second.
+Click **Start Session**. The session ID appears below the input; the dashboard also keeps a short-lived capability in memory to authorize the browser and agent tool calls. The SSE status indicator should show **connected** within a second.
 
 > **Nothing visible happened in the centre/right panels yet.** That's expected — the agent hasn't read anything yet.
 

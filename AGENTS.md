@@ -25,6 +25,12 @@ Before editing:
 
 The repository and its tests remain authoritative. Treat Graphify results and generated documentation as evidence to verify against source, configuration, and tests.
 
+## Graphify and Ponytail
+
+When `graphify-out/graph.json` exists, query it before broad source browsing: use `graphify query "<question>"`, `graphify path "<source>" "<target>"`, or `graphify explain "<concept>"`. After source changes, run `graphify update .`. Verify graph results against source and tests; stale or inferred edges are evidence, not authority. See [Graphify workflow](docs/agents/graphify.md).
+
+Ponytail is a global skill. When available, use its smallest complete change rule: reuse existing patterns, skip speculative abstractions, preserve validation, error handling, security, and accessibility, and add a focused check for non-trivial logic. Mark deliberate limits with `shortcut: <limit>, <upgrade path>`.
+
 ## Coding workflow
 
 Use this tight loop for every change:

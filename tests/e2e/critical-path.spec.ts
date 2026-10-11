@@ -23,7 +23,12 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
   })
 
   await page.getByPlaceholder('https://github.com/org/repo').fill('https://github.com/AshrafRah96/SpecVoice')
+  const sessionResponsePromise = page.waitForResponse(
+    response => response.url().endsWith('/api/sessions') && response.request().method() === 'POST'
+  )
   await page.getByRole('button', { name: 'Start Session' }).click()
+  const sessionResponse = await sessionResponsePromise
+  const { capability } = (await sessionResponse.json()) as { capability: string }
 
   // SessionControls renders the session ID once the session is created.
   const sessionIdLocator = page.locator('[data-testid="session-id"]')
@@ -38,7 +43,7 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
 
   // ── 4. Simulate agent reading a file ────────────────────────────────────
   const readFileRes = await request.post('/api/tools/read-file', {
-    data: { session_id: sessionId, path: 'README.md' },
+    data: { session_id: sessionId, session_token: capability, path: 'README.md' },
   })
   expect(readFileRes.status(), `read-file failed: ${await readFileRes.text()}`).toBe(200)
 
@@ -52,6 +57,7 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
   await request.post('/api/tools/save-decision', {
     data: {
       session_id: sessionId,
+      session_token: capability,
       summary: 'Use Postgres for session storage',
       rationale: 'Existing infra already runs Postgres',
       alternatives_considered: ['Redis', 'SQLite'],
@@ -66,7 +72,7 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
 
   // ── 6. Generate the spec ─────────────────────────────────────────────────
   await request.post('/api/tools/generate-spec', {
-    data: { session_id: sessionId },
+    data: { session_id: sessionId, session_token: capability },
   })
 
   // Spec tab becomes enabled once specOutput is non-null.
@@ -86,7 +92,9 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
   await expect(page.locator('[data-testid="build-button"]')).toBeVisible({ timeout: 5000 })
 
   // ── 8. Confirm session state via API ─────────────────────────────────────
-  const sessionRes = await request.get(`/api/sessions/${sessionId}`)
+  const sessionRes = await request.get(`/api/sessions/${sessionId}`, {
+    headers: { Authorization: `Bearer ${capability}` },
+  })
   const { session } = await sessionRes.json()
   expect(session.buildStatus).toBe('ready')
   expect(session.specOutput).toBeTruthy()

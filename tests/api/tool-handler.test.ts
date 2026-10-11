@@ -4,12 +4,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sessionStore } from '@/lib/session/store'
 import { createToolHandler, createCodeToolHandler } from '@/lib/api/tool-handler'
 import { InMemoryCodeSource, registerCodeSource } from '@/lib/code/index'
+import { issueSessionCapability } from '@/lib/session/capability'
 
 function makeRequest(url: string, body: unknown): NextRequest {
+  const data = body as Record<string, unknown>
+  const authenticatedBody =
+    typeof data?.session_id === 'string'
+      ? { ...data, session_token: data.session_token ?? issueSessionCapability(data.session_id) }
+      : body
   return new NextRequest(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(authenticatedBody),
   })
 }
 
@@ -25,6 +31,17 @@ const echoSchema = z.object({ value: z.string() })
 const echoHandler = createToolHandler(echoSchema, async (_session, input) => NextResponse.json({ value: input.value }))
 
 describe('createToolHandler', () => {
+  it('rejects requests without a session capability', async () => {
+    const session = sessionStore.createSession()
+    const res = await echoHandler(
+      new NextRequest('http://localhost/api/tools/echo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: session.id, value: 'hi' }),
+      })
+    )
+    expect(res.status).toBe(401)
+  })
   it('returns 400 for non-JSON body', async () => {
     const req = makeInvalidRequest('http://localhost/api/tools/echo')
     const res = await echoHandler(req)

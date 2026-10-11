@@ -13,7 +13,7 @@ const fixturePath = path.resolve('./tests/fixtures/sample-repo')
  * Must be called before generate-spec because the [data-testid="session-id"]
  * element is only rendered while specOutput is null.
  */
-async function createLocalSession(page: Page): Promise<string> {
+async function createLocalSession(page: Page): Promise<{ id: string; capability: string }> {
   await page.route('**/api/sessions', async route => {
     if (route.request().method() !== 'POST') {
       await route.continue()
@@ -24,7 +24,12 @@ async function createLocalSession(page: Page): Promise<string> {
 
   await page.goto('/')
   await page.getByPlaceholder('https://github.com/org/repo').fill('https://github.com/AshrafRah96/SpecVoice')
+  const responsePromise = page.waitForResponse(
+    response => response.url().endsWith('/api/sessions') && response.request().method() === 'POST'
+  )
   await page.getByRole('button', { name: 'Start Session' }).click()
+  const response = await responsePromise
+  const responseBody = (await response.json()) as { capability: string }
 
   const sessionIdLocator = page.locator('[data-testid="session-id"]')
   await expect(sessionIdLocator).toBeVisible({ timeout: 5000 })
@@ -35,17 +40,24 @@ async function createLocalSession(page: Page): Promise<string> {
     timeout: 5000,
   })
 
-  return sessionId!
+  expect(responseBody.capability).toBeTruthy()
+  return { id: sessionId!, capability: responseBody.capability }
 }
 
 /**
  * Drive the session through: save-decision → generate-spec → post-call webhook.
  * After this the "Build It" button should be visible.
  */
-async function driveSessionToReady(request: APIRequestContext, sessionId: string, webhookSecret: string | undefined) {
+async function driveSessionToReady(
+  request: APIRequestContext,
+  session: { id: string; capability: string },
+  webhookSecret: string | undefined
+) {
+  const { id: sessionId, capability } = session
   await request.post('/api/tools/save-decision', {
     data: {
-      session_id: sessionId,
+      session_id: session.id,
+      session_token: capability,
       summary: 'Use Postgres for session storage',
       rationale: 'Existing infra already runs Postgres',
       alternatives_considered: ['Redis'],
@@ -54,7 +66,7 @@ async function driveSessionToReady(request: APIRequestContext, sessionId: string
   })
 
   await request.post('/api/tools/generate-spec', {
-    data: { session_id: sessionId },
+    data: { session_id: sessionId, session_token: capability },
   })
 
   const { headers, data } = buildSignedPostCallRequest(sessionId, webhookSecret)
@@ -65,18 +77,19 @@ async function driveSessionToReady(request: APIRequestContext, sessionId: string
 
 test('build_blocked — open question blocks build and keeps Build It visible', async ({ page, request }) => {
   const webhookSecret = loadEnvVar('ELEVENLABS_WEBHOOK_SECRET')
-  const sessionId = await createLocalSession(page)
+  const session = await createLocalSession(page)
 
   // Flag an open question before triggering the build — this will block it.
   await request.post('/api/tools/flag-question', {
     data: {
-      session_id: sessionId,
+      session_id: session.id,
+      session_token: session.capability,
       question: 'Should we use Redis for caching?',
       context: 'Performance requirement TBD',
     },
   })
 
-  await driveSessionToReady(request, sessionId, webhookSecret)
+  await driveSessionToReady(request, session, webhookSecret)
 
   // Build It button should now be visible (buildStatus: 'ready').
   await expect(page.locator('[data-testid="build-button"]')).toBeVisible({ timeout: 5000 })
@@ -99,9 +112,9 @@ test('build_failed — fast failure surfaces error and shows Retry button', asyn
   // If prerequisites themselves fail (missing claude CLI or credentials), the
   // test still passes because any build_failed path produces the same UI state.
   const webhookSecret = loadEnvVar('ELEVENLABS_WEBHOOK_SECRET')
-  const sessionId = await createLocalSession(page)
+  const session = await createLocalSession(page)
 
-  await driveSessionToReady(request, sessionId, webhookSecret)
+  await driveSessionToReady(request, session, webhookSecret)
 
   // Build It button should be visible.
   await expect(page.locator('[data-testid="build-button"]')).toBeVisible({ timeout: 5000 })

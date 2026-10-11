@@ -55,11 +55,7 @@ The REST API reference uses `snake_case` throughout. The JS SDK uses `camelCase`
 
 ### Dashboard breaks silently when a mutation doesn't broadcast
 
-Every `sessionStore.updateSession()` call automatically broadcasts `session_updated`. But `setBuildStatus()`, `setComplexityAssessment()`, and other targeted mutators do not. If you call one without a subsequent `broadcastEvent()`, the session state changes server-side but the dashboard never updates.
-
-There's no error. The UI shows stale data.
-
-**Fix:** Every mutation that should update the dashboard must either use `updateSession()` (which auto-broadcasts) or explicitly call `broadcastEvent()` after. This is enforced by convention, not by the type system. A wrapper that makes the broadcast non-optional would close the gap.
+Every `sessionStore.updateSession()` call broadcasts `session_updated`. Keep new state mutations on that path. Direct `broadcastEvent()` calls are for signal events such as `call_ended` and build progress.
 
 ---
 
@@ -81,13 +77,13 @@ The `useConversation` hook accepts `connectionType: 'webrtc'` without error. It 
 
 ### ElevenLabs unit tests require `dynamicVariables` even for non-tool tests
 
-Every agent unit test fails with `"Missing required dynamic variables: {'session_id'}"` regardless of whether the test uses tools. The validation runs for all test types. The docs don't mention this.
+Every agent unit test fails with `"Missing required dynamic variables: {'session_id', 'session_token'}"` regardless of whether the test uses tools. The validation runs for all test types. The docs don't mention this.
 
-**Fix:** Add `dynamicVariables: { session_id: 'unit-test-session' }` to every test spec. Full details in [elevenlabs-sdk-holes.md §2](./elevenlabs-sdk-holes.md).
+**Fix:** Add `dynamicVariables: { session_id: 'unit-test-session', session_token: 'test-capability' }` to every test spec. Full details in [elevenlabs-sdk-holes.md §2](./elevenlabs-sdk-holes.md).
 
 ### The complexity gate always blocks the smoke test
 
-The E2E smoke test fires `flag_question` in step 3 to verify open questions work. When `POST /api/sessions/:id/build` is called in step 7, the gate blocks immediately with `build_blocked: open_questions`. First-time readers of the test assume this is a failure — it's intentional and documented in [docs/plans/06-e2e-critical-path.md](./plans/06-e2e-critical-path.md), but it's non-obvious.
+The E2E smoke test fires `flag_question` in step 3 to verify open questions work. When `POST /api/sessions/:id/build` is called in step 7, the gate blocks immediately with `build_blocked: open_questions`. First-time readers of the test assume this is a failure — it's intentional and documented in [manual smoke test](./testing/manual-smoke.md), but it's non-obvious.
 
 ---
 

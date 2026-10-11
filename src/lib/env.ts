@@ -7,6 +7,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().default('http://localhost:3000'),
   ANTHROPIC_API_KEY: z.string().optional(),
   ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
+  SESSION_CAPABILITY_SECRET: z.preprocess(value => (value === '' ? undefined : value), z.string().min(32).optional()),
+  SPECVOICE_LOCAL_REPO_ROOT: z.string().optional(),
 })
 
 const parsed = envSchema.safeParse(process.env)

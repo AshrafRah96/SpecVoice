@@ -5,22 +5,28 @@ import type { CodeSource } from '@/lib/code/types'
 import { sessionStore } from '@/lib/session/store'
 import { resolveCodeSource } from '@/lib/code/index'
 import { parseRequestBody, sessionNotFound, validationError, errorResponse } from '@/lib/api/helpers'
+import { requireSessionCapability } from '@/lib/session/capability'
+import { requireInMemorySessionStore } from '@/lib/session/deployment'
 
 type ToolFn<T> = (session: Session, input: T) => Promise<NextResponse>
 type CodeToolFn<T> = (session: Session, source: CodeSource, input: T) => Promise<NextResponse>
 
-const routingSchema = z.object({ session_id: z.string() })
+const routingSchema = z.object({ session_id: z.string(), session_token: z.string().optional() })
 
 export function createToolHandler<S extends z.ZodRawShape>(
   schema: z.ZodObject<S>,
   fn: ToolFn<z.infer<z.ZodObject<S>>>
 ): (req: NextRequest) => Promise<NextResponse> {
   return async (req: NextRequest) => {
+    const unavailable = requireInMemorySessionStore()
+    if (unavailable) return unavailable
     const body = await parseRequestBody(req)
     if (body === null) return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 })
     // Parse routing key and domain input separately so generics stay clean.
     const routing = routingSchema.safeParse(body)
     if (!routing.success) return validationError(routing.error.issues)
+    const unauthorized = requireSessionCapability(req, routing.data.session_id, routing.data.session_token)
+    if (unauthorized) return unauthorized
     const result = schema.safeParse(body)
     if (!result.success) return validationError(result.error.issues)
     const session = sessionStore.getSession(routing.data.session_id)

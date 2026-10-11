@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
 import { sessionStore } from '@/lib/session/store'
 import { env } from '@/lib/env'
+import { requireInMemorySessionStore } from '@/lib/session/deployment'
 
 const TranscriptTurnSchema = z
   .object({
@@ -35,6 +36,8 @@ const PostCallPayloadSchema = z.object({
 })
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const unavailable = requireInMemorySessionStore()
+  if (unavailable) return unavailable
   const rawBody = await req.text()
 
   // Verify webhook signature when secret is configured.

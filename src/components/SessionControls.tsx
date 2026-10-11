@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 
 interface Props {
   session: Session | null
+  sessionCapability: string | null
   isConnected: boolean
   error: string | null
   onCreateSession: (repoUrl: string) => Promise<void>
@@ -29,7 +30,7 @@ function formatDuration(secs: number | null): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function SessionControls({ session, isConnected, error, onCreateSession }: Props) {
+export function SessionControls({ session, sessionCapability, isConnected, error, onCreateSession }: Props) {
   const [repoUrl, setRepoUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const conversation = useConversation()
@@ -47,12 +48,12 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
     await conversation.startSession({
       agentId,
       connectionType: 'websocket',
-      dynamicVariables: { session_id: session.id },
+      dynamicVariables: { session_id: session.id, session_token: sessionCapability ?? '' },
       overrides: {
         conversation: { textOnly: false },
       },
     })
-  }, [conversation, session])
+  }, [conversation, session, sessionCapability])
 
   const handleEndWebCall = useCallback(async () => {
     await conversation.endSession()

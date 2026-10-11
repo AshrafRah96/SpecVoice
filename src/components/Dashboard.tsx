@@ -7,13 +7,19 @@ import { SpecPreview } from '@/components/SpecPreview'
 import { BuildPanel } from '@/components/BuildPanel'
 
 export function Dashboard() {
-  const { session, buildLog, isConnected, error, createSession, triggerBuild } = useSession()
+  const { session, sessionCapability, buildLog, isConnected, error, createSession, triggerBuild } = useSession()
 
   return (
     <div className="flex h-screen w-full gap-2 p-2 overflow-hidden bg-background">
       {/* Left panel — 280px fixed */}
       <aside className="flex-none w-[280px] h-full overflow-y-auto rounded-lg border border-border/50 bg-sidebar">
-        <SessionControls session={session} isConnected={isConnected} error={error} onCreateSession={createSession} />
+        <SessionControls
+          session={session}
+          sessionCapability={sessionCapability}
+          isConnected={isConnected}
+          error={error}
+          onCreateSession={createSession}
+        />
       </aside>
 
       {/* Centre panel — flex-1 */}

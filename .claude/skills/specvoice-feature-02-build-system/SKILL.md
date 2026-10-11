@@ -5,17 +5,17 @@ description: Use when working on the SpecVoice post-call build pipeline, the bui
 
 ## Overview
 
-Post-call build pipeline triggered by `POST /api/sessions/[id]/build`. Returns 202 immediately; runs `runGatedBuild` in the background. The real Claude Code CLI integration is **fully implemented** via `executeBuild` in `src/lib/build/executor.ts`. There is no simulation stub — the previous `simulateBuild` has been replaced.
+Post-call build pipeline triggered by `POST /api/sessions/[id]/build`. Returns 202 immediately; runs `BuildPipeline.run` in the background. Claude Code CLI execution is handled by `ClaudeProcessRunner`; workflow steps own cloning, build inputs, cleanup, and draft PR creation.
 
 ## File Map
 
-| File                                       | Purpose                                                       |
-| ------------------------------------------ | ------------------------------------------------------------- |
-| `src/app/api/sessions/[id]/build/route.ts` | Route handler — guards, complexity gate, calls `executeBuild` |
-| `src/lib/build/executor.ts`                | Main orchestration: prerequisites, clone, Claude Code CLI, PR |
-| `src/lib/build/clone.ts`                   | `cloneRepo(repoUrl)` → tmpdir, `cleanupTmpDir(dir)`           |
-| `src/lib/build/github-pr.ts`               | `createDraftPR(opts)` via Octokit                             |
-| `src/lib/build/index.ts`                   | Re-exports `executeBuild`                                     |
+| File                                       | Purpose                                             |
+| ------------------------------------------ | --------------------------------------------------- |
+| `src/app/api/sessions/[id]/build/route.ts` | Route handler — guards and starts the pipeline      |
+| `src/lib/build/pipeline.ts`                | Validation, workflow sequencing, state transitions  |
+| `src/lib/build/validate.ts`                | Complexity, prerequisite, and repository URL checks |
+| `src/lib/build/process-runner.ts`          | Claude Code CLI process and progress parsing        |
+| `src/lib/build/workflow-steps.ts`          | Clone, build inputs, draft PR, and cleanup steps    |
 
 ## Route Handler Flow (`route.ts`)
 
@@ -23,7 +23,7 @@ Post-call build pipeline triggered by `POST /api/sessions/[id]/build`. Returns 2
 2. `!session.specOutput` → 400 `"No spec to build from."`
 3. `setBuildStatus('building')` + broadcast `build_started` **synchronously**
 4. Return 202
-5. Background: `runGatedBuild(id)` — runs complexity gate, then `executeBuild`
+5. Background: `pipeline.run(id)` — validates, then runs workflow steps
 
 ## Complexity Gate
 
@@ -42,16 +42,16 @@ Blocked when: `size === 'too_large'` OR `openQuestions.length > 0`.
 
 After a complexity block: `setBuildStatus('ready')` — the spec still exists. Never set `'idle'`.
 
-## `executeBuild` Orchestration
+## `BuildPipeline` Orchestration
 
-Guards run in this order, each emitting `build_failed` on failure:
+Validation and execution run in this order:
 
-1. **Prerequisites** (`checkPrerequisites()`): `claude --version` must succeed, `ANTHROPIC_API_KEY` must be set, `GITHUB_TOKEN` must be set.
-2. **`!session.repoUrl`** → fast-fail with `"Session has no repository URL."` Sessions backed by a local path (`repoLocalPath`) hit this guard.
-3. **Clone** → `cloneRepo(session.repoUrl)` into `os.tmpdir()`, always cleaned in `finally`.
-4. **Write build inputs** → `writeBuildFiles(dir, session)` writes `SPEC.md` (raw spec) and `CONTEXT.md` (decisions + transcript) into the cloned dir.
-5. **Claude Code CLI** → `runClaudeCode(...)` (see below).
-6. **Draft PR** → `createDraftPR(...)` via Octokit; sets `buildStatus: 'complete'` and broadcasts `build_complete { prUrl }`.
+1. **Complexity** → `assessComplexity(session)` blocks unresolved questions or oversized sessions.
+2. **Prerequisites** → `checkPrerequisites()` checks the Claude Code CLI, `ANTHROPIC_API_KEY`, and `GITHUB_TOKEN`.
+3. **Repository URL** → sessions backed only by `repoLocalPath` fail with `"Session has no repository URL."`
+4. **Clone and write inputs** → workflow steps use `os.tmpdir()` and write `SPEC.md` plus `CONTEXT.md`.
+5. **Claude Code CLI** → `ClaudeProcessRunner` runs the bounded command and parses progress.
+6. **Draft PR** → workflow steps call `createDraftPR()` via Octokit and complete the build.
 
 ## Claude Code Invocation
 
@@ -59,14 +59,14 @@ Guards run in this order, each emitting `build_failed` on failure:
 claude -p "<prompt>" \
   --output-format stream-json \
   --allowedTools "Read,Write,Edit,Bash(git *),Bash(npm test *),Bash(npx *)" \
-  --max-turns 30
+  --max-turns 300
 ```
 
-Spawned with `stdio: ['ignore', 'pipe', 'inherit']` — stdout piped for NDJSON parsing, stderr inherited to server logs.
+Spawned with `stdio: ['ignore', 'pipe', 'pipe']` — stdout is parsed as NDJSON and stderr is drained into logs and failure messages.
 
 Git identity injected via env: `GIT_AUTHOR_NAME/EMAIL` and `GIT_COMMITTER_NAME/EMAIL` set to `SpecVoice / specvoice@noreply.github.com`.
 
-The prompt instructs Claude Code to: read `SPEC.md` and `CONTEXT.md`, checkout a new branch, implement changes, run tests, fix failures, commit, push. **Does not create the PR itself** — that's done by `createDraftPR` after `runClaudeCode` resolves.
+The prompt instructs Claude Code to: read `SPEC.md` and `CONTEXT.md`, checkout a new branch, implement changes, run tests, fix failures, commit, push. **Does not create the PR itself** — that's done by `createDraftPR` after `ClaudeProcessRunner` resolves.
 
 Progress is streamed: each `tool_use` block in the NDJSON output calls `onProgress(phase, detail)` → broadcasts `build_progress` SSE event. Phase is derived by `phaseFromTool(name)`:
 
@@ -100,7 +100,7 @@ interface ComplexityAssessment {
 
 `BuildPhase`: `'analyzing' | 'writing' | 'reviewing' | 'cloning' | 'pr'`
 
-`broadcastEvent` is already public from Feature 01. Do not redefine it.
+`broadcastEvent` is public on `SessionStore`. Use it for signal events; use `updateSession()` for state changes.
 
 ## Common Mistakes
 

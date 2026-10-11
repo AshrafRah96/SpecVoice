@@ -20,7 +20,7 @@ A tool has three parts that must all be in sync:
 
 ### Step 1: Create the route
 
-Create `src/app/api/tools/<your-tool-name>/route.ts`. Follow the existing routes exactly. They're consistent for a reason.
+Create `src/app/api/tools/<your-tool-name>/route.ts`. Prefer the shared `createToolHandler` or `createCodeToolHandler`; they validate the body and verify the session capability before your handler runs.
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server'
@@ -28,9 +28,10 @@ import { z } from 'zod'
 import { sessionStore } from '@/lib/session/store'
 import { parseRequestBody, sessionNotFound, validationError } from '@/lib/api/helpers'
 
-// Define your input schema. session_id is always required.
+// Define your input schema. session_id and session_token are always required.
 const schema = z.object({
   session_id: z.string(),
+  session_token: z.string(),
   // your additional parameters here
   target: z.string(),
 })
@@ -79,10 +80,16 @@ import {
   ToolRequestModel,
 } from '@elevenlabs/elevenlabs-js/api'
 
-// session_id is always injected at runtime — never ask the agent to supply it
+// session_id and session_token are injected at runtime — never ask the agent to reason about them
 const SESSION_ID_PROP = {
   type: LiteralJsonSchemaPropertyType.String,
   dynamicVariable: 'session_id',
+} as const
+
+const SESSION_TOKEN_PROP = {
+  type: LiteralJsonSchemaPropertyType.String,
+  dynamicVariable: 'session_token',
+  description: 'Short-lived capability issued when the session was created.',
 } as const
 
 export function buildYourToolDefinition(appUrl: string): ToolRequestModel {
@@ -96,9 +103,10 @@ export function buildYourToolDefinition(appUrl: string): ToolRequestModel {
         method: WebhookToolApiSchemaConfigInputMethod.Post,
         requestBodySchema: {
           type: 'object',
-          required: ['session_id', 'target'],
+          required: ['session_id', 'session_token', 'target'],
           properties: {
             session_id: SESSION_ID_PROP,
+            session_token: SESSION_TOKEN_PROP,
             target: {
               type: LiteralJsonSchemaPropertyType.String,
               description: 'What this parameter is and what format it expects.',

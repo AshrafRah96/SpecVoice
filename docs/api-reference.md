@@ -1,6 +1,6 @@
 # API Reference
 
-All routes are Next.js App Router handlers (`src/app/api/`). All request and response bodies are JSON. All tool webhook routes expect the request body to include `session_id` — this is injected automatically by the ElevenLabs agent at runtime via a `dynamicVariable` binding.
+All routes are Next.js App Router handlers (`src/app/api/`). All request and response bodies are JSON. Session reads, SSE, builds, and tool webhooks require the short-lived capability returned by session creation. Tool requests include `session_id` and `session_token`; both are injected automatically by the ElevenLabs agent at runtime via `dynamicVariable` bindings.
 
 Shared types for all request/response shapes live in [src/lib/session/types.ts](../src/lib/session/types.ts).
 
@@ -12,12 +12,11 @@ Shared types for all request/response shapes live in [src/lib/session/types.ts](
 
 Creates a new session. Returns 201 with the full session object.
 
-**Request body** (one of `repoUrl` or `repoLocalPath` is required):
+**Request body** (exactly one of `repoUrl` or `repoLocalPath` is required):
 
 ```json
 {
-  "repoUrl": "https://github.com/org/repo",
-  "repoLocalPath": "/absolute/path/to/local/repo"
+  "repoUrl": "https://github.com/org/repo"
 }
 ```
 
@@ -31,7 +30,6 @@ Creates a new session. Returns 201 with the full session object.
     "decisions": [],
     "openQuestions": [],
     "filesRead": [],
-    "specOutput": null,
     "status": "active",
     "callDurationSecs": null,
     "transcript": null,
@@ -40,17 +38,22 @@ Creates a new session. Returns 201 with the full session object.
     "complexityAssessment": null,
     "createdAt": "2026-03-31T10:00:00.000Z",
     "updatedAt": "2026-03-31T10:00:00.000Z"
-  }
+  },
+  "capability": "<short-lived-signed-capability>"
 }
 ```
 
-**Errors:** `400` if neither `repoUrl` nor `repoLocalPath` is provided, or if `repoUrl` is not a valid URL.
+For a local source, use an absolute path below `SPECVOICE_LOCAL_REPO_ROOT`.
+
+**Errors:** `400` if both or neither source is provided, if `repoUrl` is not a valid URL, or if a local path is outside the configured root.
 
 ---
 
 ### `GET /api/sessions/:id`
 
 Returns the current state of a session.
+
+**Headers:** `Authorization: Bearer <capability>`
 
 **Response `200`:**
 
@@ -65,6 +68,8 @@ Returns the current state of a session.
 ### `GET /api/sessions/:id/events`
 
 Opens a Server-Sent Events stream. The connection stays open until the client disconnects.
+
+**Query:** `?capability=<capability>` (the browser `EventSource` API cannot set an authorization header).
 
 On connection, the server sends the current session state as a `session_updated` event so clients don't need to poll `GET /api/sessions/:id` first.
 
@@ -93,19 +98,22 @@ Triggers the post-call build pipeline. Returns 202 immediately; the build runs i
 
 **Request body:** none required.
 
+**Headers:** `Authorization: Bearer <capability>` and `Idempotency-Key: <unique-build-attempt-key>`
+
 **Response `202`:**
 
 ```json
-{ "accepted": true }
+{ "accepted": true, "replayed": false }
 ```
 
 **Errors:**
 
-| Status | Condition                                                        |
-| ------ | ---------------------------------------------------------------- |
-| `400`  | `session.specOutput` is null — no spec to build from             |
-| `404`  | Session not found                                                |
-| `409`  | `session.buildStatus === 'building'` — build already in progress |
+| Status | Condition                                              |
+| ------ | ------------------------------------------------------ |
+| `400`  | `session.specOutput` is absent — no spec to build from |
+| `401`  | Missing or invalid session capability                  |
+| `404`  | Session not found                                      |
+| `409`  | Another build attempt is already in progress           |
 
 `buildStatus` is set to `'building'` synchronously before the 202 is returned. Subsequent SSE events arrive asynchronously.
 
@@ -115,7 +123,7 @@ See [Build Pipeline](./build-pipeline.md) for gate logic and the full phase sequ
 
 ## Tool Webhooks
 
-These routes are called by the ElevenLabs agent during a conversation. They are not intended to be called directly from the dashboard or browser. All receive `session_id` in the request body (injected by the agent at runtime).
+These routes are called by the ElevenLabs agent during a conversation. They are not intended to be called directly from the dashboard or browser. All receive `session_id` and `session_token` in the request body (injected by the agent at runtime).
 
 ### `POST /api/tools/list-files`
 
@@ -126,6 +134,7 @@ Lists files in the repo. Does not mutate session state — no SSE event fires.
 ```json
 {
   "session_id": "sess_abc123",
+  "session_token": "<short-lived-signed-capability>",
   "path": "src/components"
 }
 ```
@@ -136,7 +145,11 @@ Lists files in the repo. Does not mutate session state — no SSE event fires.
 
 ```json
 {
-  "files": ["src/components/Dashboard.tsx", "src/components/SessionControls.tsx"]
+  "files": [
+    { "path": "src/components", "type": "dir" },
+    { "path": "src/components/Dashboard.tsx", "type": "file" },
+    { "path": "src/components/SessionControls.tsx", "type": "file" }
+  ]
 }
 ```
 
@@ -151,6 +164,7 @@ Reads a file from the repo. Capped at 4000 characters. Appends a `FileRead` entr
 ```json
 {
   "session_id": "sess_abc123",
+  "session_token": "<short-lived-signed-capability>",
   "path": "src/lib/session/types.ts",
   "start_line": 1,
   "end_line": 50
@@ -166,8 +180,8 @@ Reads a file from the repo. Capped at 4000 characters. Appends a `FileRead` entr
   "content": {
     "path": "src/lib/session/types.ts",
     "content": "export interface Session { ... }",
-    "startLine": 1,
-    "endLine": 50
+    "lineCount": 50,
+    "truncated": false
   }
 }
 ```
@@ -185,6 +199,7 @@ Searches the repo for a query string. Does not mutate session state — no SSE e
 ```json
 {
   "session_id": "sess_abc123",
+  "session_token": "<short-lived-signed-capability>",
   "query": "broadcastEvent",
   "max_results": 20
 }
@@ -199,8 +214,9 @@ Searches the repo for a query string. Does not mutate session state — no SSE e
   "results": [
     {
       "path": "src/lib/session/store.ts",
-      "line": 42,
-      "content": "broadcastEvent(sessionId, event)"
+      "lineNumber": 42,
+      "lineContent": "broadcastEvent(sessionId, event)",
+      "context": []
     }
   ]
 }
@@ -217,6 +233,7 @@ Records an architectural decision. Appends to `session.decisions` and broadcasts
 ```json
 {
   "session_id": "sess_abc123",
+  "session_token": "<short-lived-signed-capability>",
   "summary": "Use SSE instead of WebSockets",
   "rationale": "Next.js App Router does not support WebSocket upgrade",
   "alternatives_considered": ["WebSockets", "polling"],
@@ -254,6 +271,7 @@ Records an open question that needs resolving before the build can proceed. Appe
 ```json
 {
   "session_id": "sess_abc123",
+  "session_token": "<short-lived-signed-capability>",
   "question": "Should the cache use Redis or in-memory?",
   "context": "The session store currently uses globalThis"
 }
@@ -288,7 +306,8 @@ Generates the PR spec from all accumulated decisions and file reads. Sets `sessi
 
 ```json
 {
-  "session_id": "sess_abc123"
+  "session_id": "sess_abc123",
+  "session_token": "<short-lived-signed-capability>"
 }
 ```
 
@@ -331,6 +350,8 @@ Called by ElevenLabs at the end of every conversation. Not called from the brows
 }
 ```
 
+Session reads, SSE, and build requests require the `capability` returned by session creation. Use `Authorization: Bearer <capability>`; SSE uses `?capability=<capability>`. Agent tool requests include the same value as `session_token` beside `session_id`.
+
 **Signature verification:** When `ELEVENLABS_WEBHOOK_SECRET` is set, the route verifies the `ElevenLabs-Signature` header using `elevenlabs.webhooks.constructEvent()`. Returns `401` on failure.
 
 **On success** — updates the session in a single `updateSession` call (one broadcast):
@@ -344,7 +365,7 @@ Called by ElevenLabs at the end of every conversation. Not called from the brows
 }
 ```
 
-Then emits a dedicated `call_ended` SSE event.
+Then emits a dedicated `call_ended` SSE event. The `session_updated` event arrives first because the session mutation broadcasts before the signal.
 
 **Response `200`:**
 
@@ -381,7 +402,7 @@ Fires after any session mutation. Carries the full session object — no diffing
 
 Also fires on SSE connection open (current state snapshot).
 
-**Fired by:** `read-file`, `save-decision`, `flag-question`, `generate-spec`, `post-call`, `build` (on completion/failure)
+**Fired by:** `read-file`, `save-decision`, `flag-question`, `generate-spec`, `post-call`, and build lifecycle mutations
 
 ---
 
@@ -397,7 +418,7 @@ Fires after the post-call webhook processes a session. A dedicated signal so das
 }
 ```
 
-`session_updated` fires immediately after with the fully updated session state.
+`session_updated` fires immediately before it with the fully updated session state.
 
 ---
 
@@ -470,8 +491,7 @@ Fires when the complexity gate rejects the build. `buildStatus` resets to `'read
     "lineEstimate": 600,
     "size": "medium",
     "blocked": true,
-    "blockReason": "open_questions",
-    "splitSuggestion": null
+    "blockReason": "open_questions"
   }
 }
 ```

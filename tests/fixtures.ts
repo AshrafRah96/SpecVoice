@@ -16,6 +16,7 @@ export function makeSession(overrides: Partial<Session> = {}): Session {
     callDurationSecs: null,
     transcript: null,
     buildStatus: 'idle',
+    buildAttemptKey: null,
     prUrl: null,
     complexityAssessment: null,
     createdAt: new Date().toISOString(),

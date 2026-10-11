@@ -57,7 +57,7 @@ buildStatus: BuildStatus // 'idle' | 'ready' | 'building' | 'complete' | 'failed
 
 2. **Adding `'assessing'` to BuildStatus.** The full union is `'idle' | 'ready' | 'building' | 'complete' | 'failed'`. The `'assessing'` value was cut as over-engineering. Using it causes a TypeScript error and runtime breakage.
 
-3. **Redefining `broadcastEvent` in Feature 02.** Feature 01 already makes `broadcastEvent` public in the session store. Feature 02 must import and use it directly — never redeclare or shadow it.
+3. **Redefining `broadcastEvent` in build code.** This feature makes `broadcastEvent` public in the session store. Build code must use it directly — never redeclare or shadow it.
 
 4. **Returning 4xx when session_id is missing.** ElevenLabs retries any non-200 response, flooding the server. Return 200 with a log message when `session_id` is absent.
 

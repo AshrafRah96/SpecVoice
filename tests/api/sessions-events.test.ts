@@ -2,9 +2,13 @@ import { describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/sessions/[id]/events/route'
 import { sessionStore } from '@/lib/session/store'
+import { issueSessionCapability } from '@/lib/session/capability'
 
 function makeRequest(id: string, signal?: AbortSignal): NextRequest {
-  return new NextRequest(`http://localhost/api/sessions/${id}/events`, { signal })
+  return new NextRequest(`http://localhost/api/sessions/${id}/events`, {
+    signal,
+    headers: { Authorization: `Bearer ${issueSessionCapability(id)}` },
+  })
 }
 
 async function readChunk(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<string> {

@@ -3,9 +3,13 @@ import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/sessions/[id]/build/route'
 import { sessionStore } from '@/lib/session/store'
 import type { SessionEvent, ComplexityAssessment } from '@/lib/session/types'
+import { issueSessionCapability } from '@/lib/session/capability'
 
 function makeRequest(id: string): NextRequest {
-  return new NextRequest(`http://localhost/api/sessions/${id}/build`, { method: 'POST' })
+  return new NextRequest(`http://localhost/api/sessions/${id}/build`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${issueSessionCapability(id)}`, 'Idempotency-Key': `build-${id}` },
+  })
 }
 
 describe('POST /api/sessions/[id]/build', () => {
@@ -42,7 +46,7 @@ describe('POST /api/sessions/[id]/build', () => {
     })
     const res = await POST(makeRequest(session.id), { params: Promise.resolve({ id: session.id }) })
     expect(res.status).toBe(202)
-    expect(await res.json()).toEqual({ accepted: true })
+    expect(await res.json()).toEqual({ accepted: true, replayed: false })
   })
 
   it('fires build_blocked and resets buildStatus to ready when open questions exist', async () => {

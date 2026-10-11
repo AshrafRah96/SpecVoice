@@ -1,0 +1,15 @@
+# Generated and dependency trees are not source relationships.
+node_modules/
+.next/
+coverage/
+dist/
+build/
+out/
+test-results/
+playwright-report/
+graphify-out/
+
+# Local secrets and provider state.
+.env*
+.aws/
+.ssh/

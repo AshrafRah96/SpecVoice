@@ -1,16 +1,21 @@
-import { existsSync, statSync } from 'fs'
-import { readdir, readFile } from 'fs/promises'
+import { existsSync, realpathSync, statSync } from 'fs'
+import { readdir, readFile, realpath } from 'fs/promises'
 import path from 'path'
 import { createIgnoreFilter, loadGitignoreRules } from '@/lib/code/ignore-rules'
 import { MAX_FILE_CHARS, isBinary, formatNumberedLines, buildSearchContext } from '@/lib/code/utils'
 import type { CodeSource, FileInfo, FileContent, SearchResult } from '@/lib/code/types'
+import { assertLocalRepoPathAllowed, isWithinDirectory } from '@/lib/code/path-policy'
 
 export class LocalCodeSource implements CodeSource {
   private rootPath: string
   private ig: ReturnType<typeof createIgnoreFilter>
 
   constructor(rootPath: string) {
-    const resolved = path.resolve(rootPath)
+    const resolved = realpathSync(assertLocalRepoPathAllowed(rootPath))
+    const allowedRoot = process.env.SPECVOICE_LOCAL_REPO_ROOT || undefined
+    if (allowedRoot && !isWithinDirectory(realpathSync(allowedRoot), resolved)) {
+      throw new Error('Local repo path resolves outside SPECVOICE_LOCAL_REPO_ROOT.')
+    }
     if (!existsSync(resolved) || !statSync(resolved).isDirectory()) {
       throw new Error(
         `Local repo path is not a directory: ${rootPath}. ` + 'Check that the path exists and is accessible.'
@@ -26,6 +31,7 @@ export class LocalCodeSource implements CodeSource {
 
     const results: FileInfo[] = []
     for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue
       // Build relative path with forward slashes
       const rel = path
         .join(entry.parentPath ?? entry.path, entry.name)
@@ -55,11 +61,14 @@ export class LocalCodeSource implements CodeSource {
   }
 
   async readFile(filePath: string, startLine?: number, endLine?: number): Promise<FileContent> {
-    const fullPath = path.join(this.rootPath, filePath)
+    const fullPath = path.resolve(this.rootPath, filePath)
+    if (!isWithinDirectory(this.rootPath, fullPath)) throw new Error(`File path escapes repository root: ${filePath}`)
 
     let rawBuffer: Buffer
     try {
-      rawBuffer = await readFile(fullPath)
+      const realPath = await realpath(fullPath)
+      if (!isWithinDirectory(this.rootPath, realPath)) throw new Error('outside repository root')
+      rawBuffer = await readFile(realPath)
     } catch {
       throw new Error(`File not found: ${filePath}`)
     }
@@ -104,7 +113,11 @@ export class LocalCodeSource implements CodeSource {
 
       let rawBuffer: Buffer
       try {
-        rawBuffer = await readFile(path.join(this.rootPath, filePath))
+        const fullPath = path.resolve(this.rootPath, filePath)
+        if (!isWithinDirectory(this.rootPath, fullPath)) continue
+        const realPath = await realpath(fullPath)
+        if (!isWithinDirectory(this.rootPath, realPath)) continue
+        rawBuffer = await readFile(realPath)
       } catch {
         continue
       }

@@ -5,7 +5,7 @@ description: Use when building, modifying, or debugging SpecVoice dashboard comp
 
 ## Overview
 
-The dashboard is a three-panel layout rendered by `Dashboard.tsx`. Feature 05 redesigned the UI and reversed Feature 03 constraints — treat Feature 05 as authoritative.
+The dashboard is a three-panel layout rendered by `Dashboard.tsx`. Current components, styles, and tests are authoritative.
 
 Component tree:
 
@@ -29,7 +29,7 @@ SSE events and their effect on hook state:
 | Event             | Action                                                                      |
 | ----------------- | --------------------------------------------------------------------------- |
 | `session_updated` | Replace full session object — carries ALL state changes                     |
-| `call_ended`      | **Nothing** — session_updated fires immediately after and carries the state |
+| `call_ended`      | **Nothing** — session_updated fires before it and carries the state         |
 | `build_started`   | Clear `buildLog` array                                                      |
 | `build_progress`  | Append `{phase, detail, timestamp}` to `buildLog`                           |
 | `build_complete`  | **Nothing** — session_updated carries `prUrl` and `buildStatus: 'complete'` |
@@ -92,7 +92,7 @@ Requires `@elevenlabs/react` — install it before importing `useConversation`.
 ## Common Mistakes
 
 1. **SpecPreview switches on `call_ended`** — Wrong. Switch when `session.specOutput !== null`. The spec is populated before `call_ended` fires.
-2. **Avoiding shadcn/ui** — Wrong. Feature 05 reversed the Feature 03 ban. shadcn IS in the stack.
+2. **Avoiding shadcn/ui** — Wrong. shadcn/ui is part of the stack.
 3. **Inline hex colors** (`style={{ color: '#3b82f6' }}`) — Wrong. Use token classes backed by `globals.css` custom properties.
 4. **Tailwind arbitrary color values** (`bg-[#0f0f0e]`) — Wrong. Use token classes: `bg-primary`, `bg-card`, etc.
 5. **Status state machine from intuition** — Wrong. Use the table above; the mapping between `buildStatus` values and display states is non-obvious.

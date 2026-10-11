@@ -48,6 +48,7 @@ export interface Session {
   callDurationSecs: number | null
   transcript: string | null
   buildStatus: BuildStatus
+  buildAttemptKey?: string | null
   prUrl: string | null
   complexityAssessment: ComplexityAssessment | null
   createdAt: string

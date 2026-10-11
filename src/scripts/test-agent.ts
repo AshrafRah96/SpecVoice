@@ -7,9 +7,9 @@ loadEnvConfig(process.cwd())
 // Unit test definitions. Each is upserted into ElevenLabs by name on every run.
 // type "tool"  → verifies a tool call was made
 // type "llm"   → evaluates the agent's conversational response via LLM
-// session_id is declared as a dynamic variable in all agent tools.
+// session_id and session_token are declared as dynamic variables in all agent tools.
 // Unit tests must supply it or ElevenLabs rejects the run.
-const TEST_DYNAMIC_VARS = { session_id: 'unit-test-session' }
+const TEST_DYNAMIC_VARS = { session_id: 'unit-test-session', session_token: 'test-capability' }
 
 const UNIT_TESTS = [
   {
@@ -272,8 +272,8 @@ async function main() {
           temperature: 0.5,
         },
       },
-      // Satisfy dynamic variable validation — tools use session_id in webhook URLs/headers.
-      dynamicVariables: { session_id: 'sim-session-001' },
+      // Satisfy dynamic variable validation — tools use session_id and session_token in webhook payloads.
+      dynamicVariables: { session_id: 'sim-session-001', session_token: 'test-capability' },
       // Mock all webhook tools so simulation doesn't call real endpoints (server not running).
       toolMockConfig: {
         list_files: {

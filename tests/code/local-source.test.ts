@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import path from 'path'
+import fs from 'fs'
+import os from 'os'
 import { LocalCodeSource } from '@/lib/code/local-source'
 
 const FIXTURE_PATH = path.resolve(__dirname, '../fixtures/sample-repo')
@@ -52,6 +54,25 @@ describe('LocalCodeSource', () => {
 
   it('readFile throws on missing file', async () => {
     await expect(source.readFile('nonexistent.ts')).rejects.toThrow('nonexistent.ts')
+  })
+
+  it('rejects paths that escape the repository root', async () => {
+    await expect(source.readFile('../package.json')).rejects.toThrow(/escapes repository root/)
+  })
+
+  it('rejects symlinks that resolve outside the repository root', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'specvoice-local-source-'))
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'specvoice-outside-'))
+    fs.writeFileSync(path.join(outside, 'secret.txt'), 'secret')
+    fs.symlinkSync(outside, path.join(root, 'linked'))
+
+    try {
+      const isolated = new LocalCodeSource(root)
+      await expect(isolated.readFile('linked/secret.txt')).rejects.toThrow('File not found')
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+      fs.rmSync(outside, { recursive: true, force: true })
+    }
   })
 
   it('searchCode finds matches with context', async () => {

@@ -22,13 +22,13 @@ The flag means "pass if any tool call matches the criteria in `toolCallParameter
 
 ## 2. Unit tests require `dynamicVariables` even when they don't call tools
 
-Every unit test fails with `"Missing required dynamic variables in tools: {'session_id'}"` even though your test has nothing to do with tools.
+Every unit test fails with `"Missing required dynamic variables in tools: {'session_id', 'session_token'}"` even though your test has nothing to do with tools.
 
 ElevenLabs validates that every dynamic variable declared anywhere in the agent's tool schemas is supplied before running a test. That validation fires regardless of test type. A pure `type: 'llm'` test that never touches a tool still has to pass it.
 
 The `dynamicVariables` field does exist in the type definitions for both `CreateToolCallUnitTestRequest` and `CreateResponseUnitTestRequest`, but nothing in the docs flags it as required or explains when validation runs.
 
-**Fix:** Add `dynamicVariables: { session_id: 'unit-test-session' }` to every unit test spec. A dummy string value is fine — it just needs to be present.
+**Fix:** Add `dynamicVariables: { session_id: 'unit-test-session', session_token: 'test-capability' }` to every unit test spec. Dummy strings are fine for mocked tests — they just need to be present.
 
 **References:**
 
@@ -94,7 +94,7 @@ When the conversation history contains no prior tool calls, the agent infers it 
 
 ## 6. `simulateConversation` requires `dynamicVariables` for all agent tool dynamic variables
 
-Simulation fails with HTTP 400 `"Missing required dynamic variables: {'session_id'}"`.
+Simulation fails with HTTP 400 `"Missing required dynamic variables: {'session_id', 'session_token'}"`.
 
 Same validation as issue #2. `simulationSpecification.dynamicVariables` must supply every dynamic variable declared in agent tools. Also worth setting `toolMockConfig` for all webhook tools — otherwise the simulation will attempt to call real localhost endpoints.
 
@@ -102,7 +102,7 @@ Same validation as issue #2. `simulationSpecification.dynamicVariables` must sup
 
 ```typescript
 simulationSpecification: {
-  dynamicVariables: { session_id: 'sim-session-001' },
+  dynamicVariables: { session_id: 'sim-session-001', session_token: 'test-capability' },
   toolMockConfig: {
     list_files: {
       defaultReturnValue: JSON.stringify({ files: [...] })

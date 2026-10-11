@@ -2,12 +2,18 @@ import { describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 import { sessionStore } from '@/lib/session/store'
 import { toolRegistry } from '@/lib/api/tool-registry'
+import { issueSessionCapability } from '@/lib/session/capability'
 
 function makeRequest(body: unknown): NextRequest {
+  const data = body as Record<string, unknown>
+  const authenticatedBody =
+    typeof data?.session_id === 'string'
+      ? { ...data, session_token: data.session_token ?? issueSessionCapability(data.session_id) }
+      : body
   return new NextRequest('http://localhost/api/tools/test', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(authenticatedBody),
   })
 }
 

@@ -37,3 +37,17 @@ _Avoid_: Deploy, release
 **Graphify**:
 The optional repository knowledge graph used to trace relationships and identify likely impact and linked tests; source code and tests remain the authority.
 _Avoid_: Source of truth, code generator
+
+## Security and execution
+
+**Session capability**:
+A short-lived signed credential issued for one Session and required to read its state or trigger work.
+_Avoid_: Session ID, API key
+
+**Repository root**:
+The directory boundary that contains the local files a Session may inspect.
+_Avoid_: Working directory, filesystem root
+
+**Build attempt**:
+One idempotent request to turn a completed Spec into a reviewable repository change.
+_Avoid_: Build job, deploy

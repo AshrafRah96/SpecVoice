@@ -29,6 +29,7 @@ class SessionStore {
       callDurationSecs: null,
       transcript: null,
       buildStatus: 'idle',
+      buildAttemptKey: null,
       prUrl: null,
       complexityAssessment: null,
       createdAt: now,
@@ -108,10 +109,29 @@ class SessionStore {
     return session
   }
 
-  startBuild(id: string): Session {
-    const session = this.setBuildStatus(id, 'building')
+  tryStartBuild(
+    id: string,
+    attemptKey: string
+  ): { status: 'started' | 'replayed' | 'conflict' | 'not_found'; session?: Session } {
+    const current = this.sessions.get(id)
+    if (!current) return { status: 'not_found' }
+    if (current.buildStatus === 'building') {
+      return current.buildAttemptKey === attemptKey
+        ? { status: 'replayed', session: current }
+        : { status: 'conflict', session: current }
+    }
+
+    const session = this.updateSession(id, { buildStatus: 'building', buildAttemptKey: attemptKey })
     this.broadcastEvent(id, { type: 'build_started', sessionId: id })
-    return session
+    return { status: 'started', session }
+  }
+
+  startBuild(id: string, attemptKey = randomUUID()): Session {
+    const result = this.tryStartBuild(id, attemptKey)
+    if (result.status !== 'started' || !result.session) {
+      throw new Error(`Build cannot start for session ${id}: ${result.status}`)
+    }
+    return result.session
   }
 
   blockBuild(id: string, assessment: ComplexityAssessment): Session {

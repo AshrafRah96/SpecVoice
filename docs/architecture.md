@@ -107,20 +107,25 @@ Never put handler logic in the route file, and never put ElevenLabs schema confi
 
 ---
 
-## How `session_id` travels from browser to tool webhook
+## How session capabilities travel from browser to tool webhook
 
-When a call starts, the browser calls `conversation.startSession()` with `dynamicVariables: { session_id: session.id }`. ElevenLabs stores this as a conversation variable.
+When a session is created, the server returns a short-lived capability alongside the session. When a call starts, the browser calls `conversation.startSession()` with `dynamicVariables: { session_id: session.id, session_token: capability }`. ElevenLabs stores both as conversation variables.
 
-Each tool definition has `session_id` wired with `dynamicVariable: 'session_id'` in its parameter schema:
+Each tool definition wires both values with `dynamicVariable` fields in its parameter schema:
 
 ```typescript
 const SESSION_ID_PROP = {
   type: LiteralJsonSchemaPropertyType.String,
   dynamicVariable: 'session_id',
 }
+
+const SESSION_TOKEN_PROP = {
+  type: LiteralJsonSchemaPropertyType.String,
+  dynamicVariable: 'session_token',
+}
 ```
 
-At call time, ElevenLabs injects the session ID into every outbound webhook request body automatically. The tool routes read it, look up the session, and do their work. The session ID never needs to be re-transmitted or managed by the agent's LLM reasoning — it's infrastructure-level routing.
+At call time, ElevenLabs injects both values into every outbound webhook request body automatically. The tool handler verifies the capability before looking up the session. The capability never enters the `Session` object or the generated spec.
 
 This `dynamicVariable` field is an ElevenLabs extension to JSON Schema and is not documented in the server tools guide. See [elevenlabs-sdk-holes.md §9](./elevenlabs-sdk-holes.md) for the discovery.
 
@@ -136,7 +141,7 @@ The `useSession` hook in [src/components/hooks/useSession.ts](../src/components/
 4. Reconnects with exponential backoff on disconnect
 5. Cleans up the `EventSource` on unmount
 
-The critical rule: **`session_updated` carries all state**. Events like `call_ended`, `build_complete`, and `build_failed` are signals, not the authoritative state. The corresponding `session_updated` that fires immediately after is what actually updates the UI. This means dashboard consumers never need to diff events — they just use the latest session object.
+The critical rule: **`session_updated` carries all state**. Events like `call_ended`, `build_complete`, and `build_failed` are signals, not the authoritative state. The dashboard renders the latest session object and does not derive state from signal events.
 
 ---
 
@@ -145,7 +150,7 @@ The critical rule: **`session_updated` carries all state**. Events like `call_en
 Two implementations of `CodeSource`:
 
 - `GitHubCodeSource` — reads via Octokit; requires `GITHUB_TOKEN` for private repos
-- `LocalCodeSource` — reads from `repoLocalPath` via the Node.js `fs` module
+- `LocalCodeSource` — reads from `repoLocalPath` via the Node.js `fs` module. Public session creation accepts local paths only below `SPECVOICE_LOCAL_REPO_ROOT`; traversal and symlink escapes are rejected.
 
 Both are resolved from session state via `resolveCodeSource(session)` in [src/lib/code/index.ts](../src/lib/code/index.ts). Route handlers never instantiate a code source directly.
 
@@ -161,4 +166,6 @@ The build pipeline runs strictly post-call. It is never triggered during a voice
 2. Running a multi-turn Claude Code CLI process during an active voice call would add unpredictable latency to webhook responses
 3. The complexity gate (which reads `session.filesRead` and `session.openQuestions`) needs the complete call state
 
-See [build-pipeline.md](./build-pipeline.md) for the current state of the implementation and the intended Claude Code CLI design.
+See [build-pipeline.md](./build-pipeline.md) for the current implementation and phase sequence.
+
+Session routes require the short-lived capability returned by `POST /api/sessions`. The capability is passed in an `Authorization: Bearer` header for browser requests, as an SSE query parameter where `EventSource` cannot set headers, and as `session_token` in agent tool payloads. The in-memory session store is explicitly single-process; production traffic is rejected unless `SPECVOICE_ALLOW_IN_MEMORY_SESSIONS=true` is set.

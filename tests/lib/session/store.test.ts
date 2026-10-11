@@ -207,6 +207,14 @@ describe('SessionStore build lifecycle mutations', () => {
     expect(events.some(e => e.type === 'build_started')).toBe(true)
   })
 
+  it('tryStartBuild makes concurrent attempts conflict and replays the same key', () => {
+    const session = sessionStore.createSession({ buildStatus: 'ready', specOutput: '# Spec' })
+
+    expect(sessionStore.tryStartBuild(session.id, 'attempt-1').status).toBe('started')
+    expect(sessionStore.tryStartBuild(session.id, 'attempt-1').status).toBe('replayed')
+    expect(sessionStore.tryStartBuild(session.id, 'attempt-2').status).toBe('conflict')
+  })
+
   it('blockBuild transitions to ready and emits build_blocked with assessment', () => {
     const session = sessionStore.createSession({ buildStatus: 'building' })
     const events = captureEvents(session.id)
