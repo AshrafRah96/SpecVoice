@@ -38,8 +38,7 @@ const UNIT_TESTS = [
       ],
       failureExamples: [
         {
-          response:
-            "You'll need to install NextAuth.js and configure OAuth providers in your next.config.js.",
+          response: "You'll need to install NextAuth.js and configure OAuth providers in your next.config.js.",
           type: 'failure' as const,
         },
       ],
@@ -91,30 +90,33 @@ const UNIT_TESTS = [
         },
         {
           role: 'agent' as const,
-          message: "No middleware layer. Decision: IP-based rate limiting, blanket 100 req/min, added before route handlers.",
+          message:
+            'No middleware layer. Decision: IP-based rate limiting, blanket 100 req/min, added before route handlers.',
           timeInCallSecs: 20,
         },
         {
           role: 'user' as const,
-          message: "Perfect. Write it up.",
+          message: 'Perfect. Write it up.',
           timeInCallSecs: 25,
         },
       ],
       // Agent should call generate_spec or verbally confirm — NOT explore code at this late stage.
       successCondition:
-        "The agent wraps up by calling generate_spec, confirming the spec will be generated, or asking one final clarifying question. It does NOT explore code (list_files, read_file) or write implementation steps at this stage.",
+        'The agent wraps up by calling generate_spec, confirming the spec will be generated, or asking one final clarifying question. It does NOT explore code (list_files, read_file) or write implementation steps at this stage.',
       successExamples: [
-        { response: 'Alright, capturing everything — the rate limiting spec is ready.', type: 'success' as const },
+        {
+          response: 'Alright, capturing everything — the rate limiting spec is ready.',
+          type: 'success' as const,
+        },
         { response: '[calls generate_spec to produce the PR spec]', type: 'success' as const },
       ],
       failureExamples: [
         {
-          response: "[calls list_files to explore the repository before writing the spec]",
+          response: '[calls list_files to explore the repository before writing the spec]',
           type: 'failure' as const,
         },
         {
-          response:
-            "Here's the implementation: app.use(rateLimit({ windowMs: 15 * 60 * 1000 }))",
+          response: "Here's the implementation: app.use(rateLimit({ windowMs: 15 * 60 * 1000 }))",
           type: 'failure' as const,
         },
       ],
@@ -126,20 +128,16 @@ const UNIT_TESTS = [
       type: 'llm' as const,
       name: 'specvoice-vague-request-triggers-pushback',
       dynamicVariables: TEST_DYNAMIC_VARS,
-      chatHistory: [
-        { role: 'user' as const, message: 'Add authentication.', timeInCallSecs: 0 },
-      ],
+      chatHistory: [{ role: 'user' as const, message: 'Add authentication.', timeInCallSecs: 0 }],
       successCondition:
-        "The agent does not start exploring the repo or proposing a solution. It asks what kind of auth, who the users are, or what the current setup is before doing anything.",
+        'The agent does not start exploring the repo or proposing a solution. It asks what kind of auth, who the users are, or what the current setup is before doing anything.',
       successExamples: [
         {
-          response: "Before I dig in — what kind of auth? OAuth, magic links, API keys?",
+          response: 'Before I dig in — what kind of auth? OAuth, magic links, API keys?',
           type: 'success' as const,
         },
       ],
-      failureExamples: [
-        { response: "Sure, let me look at the repo first.", type: 'failure' as const },
-      ],
+      failureExamples: [{ response: 'Sure, let me look at the repo first.', type: 'failure' as const }],
     },
   },
   {
@@ -148,9 +146,7 @@ const UNIT_TESTS = [
       type: 'llm' as const,
       name: 'specvoice-tone-concise-and-direct',
       dynamicVariables: TEST_DYNAMIC_VARS,
-      chatHistory: [
-        { role: 'user' as const, message: 'What did you find in the codebase?', timeInCallSecs: 0 },
-      ],
+      chatHistory: [{ role: 'user' as const, message: 'What did you find in the codebase?', timeInCallSecs: 0 }],
       successCondition:
         "The response is 6 sentences or fewer. No filler opener phrases like 'Great question!', 'Certainly!', or 'I'd be happy to'. Peer-level, direct tone.",
       successExamples: [
@@ -280,8 +276,16 @@ async function main() {
       dynamicVariables: { session_id: 'sim-session-001' },
       // Mock all webhook tools so simulation doesn't call real endpoints (server not running).
       toolMockConfig: {
-        list_files: { defaultReturnValue: JSON.stringify({ files: ['src/app/page.tsx', 'src/lib/env.ts', 'src/app/api/tools/list-files/route.ts'] }) },
-        read_file: { defaultReturnValue: JSON.stringify({ content: '// placeholder file content for simulation' }) },
+        list_files: {
+          defaultReturnValue: JSON.stringify({
+            files: ['src/app/page.tsx', 'src/lib/env.ts', 'src/app/api/tools/list-files/route.ts'],
+          }),
+        },
+        read_file: {
+          defaultReturnValue: JSON.stringify({
+            content: '// placeholder file content for simulation',
+          }),
+        },
         search_code: { defaultReturnValue: JSON.stringify({ results: [] }) },
         save_decision: { defaultReturnValue: JSON.stringify({ ok: true }) },
         flag_question: { defaultReturnValue: JSON.stringify({ ok: true }) },

@@ -56,9 +56,7 @@ describe('guardBuildTransition', () => {
   })
 
   it('error message includes the session id', () => {
-    expect(() => guardBuildTransition('idle', 'failed', 'my-session-id')).toThrow(
-      /my-session-id/
-    )
+    expect(() => guardBuildTransition('idle', 'failed', 'my-session-id')).toThrow(/my-session-id/)
   })
 
   it('same-status is a no-op for all terminal states', () => {

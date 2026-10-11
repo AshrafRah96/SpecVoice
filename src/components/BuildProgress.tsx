@@ -11,10 +11,10 @@ interface Props {
 // Record<BuildPhase, ...> enforces exhaustiveness — any new BuildPhase value causes a compile error here
 const PHASE_COLORS: Record<BuildPhase, string> = {
   analyzing: 'text-foreground',
-  writing:   'text-success',
+  writing: 'text-success',
   reviewing: 'text-warning',
-  cloning:   'text-muted-foreground',
-  pr:        'text-success',
+  cloning: 'text-muted-foreground',
+  pr: 'text-success',
 }
 
 export function BuildProgress({ entries, isBuilding }: Props) {
@@ -29,7 +29,8 @@ export function BuildProgress({ entries, isBuilding }: Props) {
       ))}
       {isBuilding && (
         <div className="text-muted-foreground">
-          {'> '}<span className="animate-pulse">_</span>
+          {'> '}
+          <span className="animate-pulse">_</span>
         </div>
       )}
     </div>

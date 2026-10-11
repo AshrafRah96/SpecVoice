@@ -97,7 +97,7 @@ Click **Start Web Call**. Your browser will request microphone access if it hasn
 
 You'll hear the agent's opening line:
 
-> *"Alright, I've got access to the repo. Give me a moment to look around, then tell me what we're building."*
+> _"Alright, I've got access to the repo. Give me a moment to look around, then tell me what we're building."_
 
 The **Orb** in the left panel pulses to show the agent is active.
 
@@ -109,13 +109,13 @@ Describe the feature you want to build. The agent is configured with `TurnEagern
 
 **What the agent does during the call:**
 
-| You say... | Agent does... | Dashboard updates |
-|---|---|---|
-| "What files are in the src directory?" | Calls `list_files` | No visible change (no mutation) |
-| Anything about a specific file | Calls `read_file` | Centre panel: file appears in **Files Read** list |
-| "Let's use X approach because Y" | Calls `save_decision` | Right panel: decision card appears live |
-| "I'm not sure about the auth layer" | Calls `flag_question` | Decision list: open question added |
-| "OK write it up" | Calls `generate_spec` | Right panel: switches to **Spec** tab |
+| You say...                             | Agent does...         | Dashboard updates                                 |
+| -------------------------------------- | --------------------- | ------------------------------------------------- |
+| "What files are in the src directory?" | Calls `list_files`    | No visible change (no mutation)                   |
+| Anything about a specific file         | Calls `read_file`     | Centre panel: file appears in **Files Read** list |
+| "Let's use X approach because Y"       | Calls `save_decision` | Right panel: decision card appears live           |
+| "I'm not sure about the auth layer"    | Calls `flag_question` | Decision list: open question added                |
+| "OK write it up"                       | Calls `generate_spec` | Right panel: switches to **Spec** tab             |
 
 File reads are capped at 4000 characters. If the agent reads the same file twice, two entries appear.
 
@@ -158,13 +158,13 @@ Click **Build It**.
 
 The build runs asynchronously. The right panel switches to **BuildProgress** and streams phase updates live via SSE:
 
-| Phase | What's happening |
-|---|---|
+| Phase       | What's happening                                     |
+| ----------- | ---------------------------------------------------- |
 | `analyzing` | Parsing spec decisions, identifying affected modules |
-| `writing` | Generating implementation scaffold |
-| `reviewing` | Running static checks |
-| `cloning` | Cloning repo to temp dir |
-| `pr` | Creating draft PR via GitHub API |
+| `writing`   | Generating implementation scaffold                   |
+| `reviewing` | Running static checks                                |
+| `cloning`   | Cloning repo to temp dir                             |
+| `pr`        | Creating draft PR via GitHub API                     |
 
 When complete, the PR URL appears in the panel.
 
@@ -172,11 +172,11 @@ When complete, the PR URL appears in the panel.
 
 ## What to do if it goes wrong
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| Spec tab never appears | `generate_spec` webhook didn't fire | Ask the agent explicitly: "please generate the spec now" |
-| Build blocked immediately | Open questions in the session | Resolve them by continuing the conversation, then rebuild |
-| Build blocked: `too_large` | Agent read ≥ 100 files | Narrow scope — the spec's split suggestion shows how to break it up |
-| Build stuck in `analyzing` for > 5 min | Claude Code CLI running a complex spec | Check server logs; kill and retry with a narrower scope |
+| Symptom                                | Likely cause                           | Fix                                                                 |
+| -------------------------------------- | -------------------------------------- | ------------------------------------------------------------------- |
+| Spec tab never appears                 | `generate_spec` webhook didn't fire    | Ask the agent explicitly: "please generate the spec now"            |
+| Build blocked immediately              | Open questions in the session          | Resolve them by continuing the conversation, then rebuild           |
+| Build blocked: `too_large`             | Agent read ≥ 100 files                 | Narrow scope — the spec's split suggestion shows how to break it up |
+| Build stuck in `analyzing` for > 5 min | Claude Code CLI running a complex spec | Check server logs; kill and retry with a narrower scope             |
 
 For webhook and audio issues, see [README Troubleshooting](../README.md#troubleshooting).

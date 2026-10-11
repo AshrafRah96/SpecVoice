@@ -1,5 +1,14 @@
 import { randomUUID } from 'crypto'
-import type { Session, SessionEvent, BuildStatus, BuildPhase, ComplexityAssessment, Decision, FileRead, OpenQuestion } from '@/lib/session/types'
+import type {
+  Session,
+  SessionEvent,
+  BuildStatus,
+  BuildPhase,
+  ComplexityAssessment,
+  Decision,
+  FileRead,
+  OpenQuestion,
+} from '@/lib/session/types'
 import { createHotReloadSafeSingleton } from '@/lib/singleton'
 import { guardBuildTransition } from '@/lib/session/build-state-machine'
 
@@ -140,7 +149,7 @@ class SessionStore {
     }
   }
 
-  private broadcastEvent(sessionId: string, event: SessionEvent): void {
+  broadcastEvent(sessionId: string, event: SessionEvent): void {
     this.listeners.get(sessionId)?.forEach(listener => listener(event))
   }
 }

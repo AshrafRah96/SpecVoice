@@ -34,7 +34,10 @@ describe('makeDecision', () => {
   })
 
   it('applies overrides over the defaults', () => {
-    const d = makeDecision('Use Redis', { rationale: 'Low latency', alternativesConsidered: ['Memcached'] })
+    const d = makeDecision('Use Redis', {
+      rationale: 'Low latency',
+      alternativesConsidered: ['Memcached'],
+    })
     expect(d.rationale).toBe('Low latency')
     expect(d.alternativesConsidered).toEqual(['Memcached'])
   })

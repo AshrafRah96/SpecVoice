@@ -1,5 +1,7 @@
 # Post-Call Build System
 
+> Historical implementation plan. The current behavior is documented in [Build Pipeline](../build-pipeline.md), and the current test paths live under `tests/lib/`.
+
 > Depends on: session types with BuildStatus (feature 01), post-call webhook setting buildStatus to 'ready' (feature 01), broadcastEvent on session store (feature 01)
 > Blocked by: feature 01 (session type changes)
 > Blocks: dashboard "Build it" button

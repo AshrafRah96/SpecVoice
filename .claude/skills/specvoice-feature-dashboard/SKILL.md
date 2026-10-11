@@ -8,6 +8,7 @@ description: Use when building, modifying, or debugging SpecVoice dashboard comp
 The dashboard is a three-panel layout rendered by `Dashboard.tsx`. Feature 05 redesigned the UI and reversed Feature 03 constraints — treat Feature 05 as authoritative.
 
 Component tree:
+
 ```
 src/components/
 ├── Dashboard.tsx
@@ -25,28 +26,28 @@ src/components/
 
 SSE events and their effect on hook state:
 
-| Event | Action |
-|---|---|
-| `session_updated` | Replace full session object — carries ALL state changes |
-| `call_ended` | **Nothing** — session_updated fires immediately after and carries the state |
-| `build_started` | Clear `buildLog` array |
-| `build_progress` | Append `{phase, detail, timestamp}` to `buildLog` |
-| `build_complete` | **Nothing** — session_updated carries `prUrl` and `buildStatus: 'complete'` |
-| `build_failed` | **Nothing** — session_updated carries `buildStatus: 'failed'` |
-| `build_blocked` | **Nothing** — session_updated carries `complexityAssessment` |
+| Event             | Action                                                                      |
+| ----------------- | --------------------------------------------------------------------------- |
+| `session_updated` | Replace full session object — carries ALL state changes                     |
+| `call_ended`      | **Nothing** — session_updated fires immediately after and carries the state |
+| `build_started`   | Clear `buildLog` array                                                      |
+| `build_progress`  | Append `{phase, detail, timestamp}` to `buildLog`                           |
+| `build_complete`  | **Nothing** — session_updated carries `prUrl` and `buildStatus: 'complete'` |
+| `build_failed`    | **Nothing** — session_updated carries `buildStatus: 'failed'`               |
+| `build_blocked`   | **Nothing** — session_updated carries `complexityAssessment`                |
 
 `buildLog` is a separate hook state (`BuildLogEntry[]`), not on the Session object.
 
 ## Status State Machine
 
-| Display | Condition |
-|---|---|
-| idle | `session` is null |
-| in call | `session.status === 'active'` |
+| Display    | Condition                                                        |
+| ---------- | ---------------------------------------------------------------- |
+| idle       | `session` is null                                                |
+| in call    | `session.status === 'active'`                                    |
 | spec ready | `session.specOutput !== null && session.buildStatus === 'ready'` |
-| building | `session.buildStatus === 'building'` |
-| complete | `session.buildStatus === 'complete'` |
-| failed | `session.buildStatus === 'failed'` |
+| building   | `session.buildStatus === 'building'`                             |
+| complete   | `session.buildStatus === 'complete'`                             |
+| failed     | `session.buildStatus === 'failed'`                               |
 
 ## SpecPreview Tab-Switch Logic
 
@@ -57,6 +58,7 @@ Switch from decision cards to spec view when `session.specOutput !== null`. Do n
 All colors flow through CSS custom properties defined in `src/app/globals.css`. Never use inline hex (`style={{ color: '#hex' }}`) or Tailwind arbitrary values (`bg-[#0f0f0e]`).
 
 Token classes to use:
+
 - Backgrounds: `bg-primary`, `bg-sidebar`, `bg-card`
 - Text: `text-foreground`, `text-muted-foreground`, `text-primary-foreground`
 - Borders: `border-border`
@@ -79,13 +81,13 @@ Requires `@elevenlabs/react` — install it before importing `useConversation`.
 
 ## data-testid Attributes (Required for E2E)
 
-| Attribute | Location |
-|---|---|
-| `session-id` | SessionControls — renders session ID (only visible when `!session.specOutput`) |
-| `sse-status` | SessionControls — SSE connection status text ("connected" or "disconnected") |
-| `file-explorer` | FileExplorer root |
-| `spec-preview` | SpecPreview root |
-| `build-button` | BuildPanel — Build it button |
+| Attribute       | Location                                                                       |
+| --------------- | ------------------------------------------------------------------------------ |
+| `session-id`    | SessionControls — renders session ID (only visible when `!session.specOutput`) |
+| `sse-status`    | SessionControls — SSE connection status text ("connected" or "disconnected")   |
+| `file-explorer` | FileExplorer root                                                              |
+| `spec-preview`  | SpecPreview root                                                               |
+| `build-button`  | BuildPanel — Build it button                                                   |
 
 ## Common Mistakes
 

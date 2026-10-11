@@ -29,11 +29,11 @@ export type BuildPhase = 'analyzing' | 'writing' | 'reviewing' | 'cloning' | 'pr
 export interface ComplexityAssessment {
   fileCount: number
   openQuestionCount: number
-  lineEstimate: number          // fileCount * 50
+  lineEstimate: number // fileCount * 50
   size: 'small' | 'medium' | 'large' | 'too_large'
   blocked: boolean
   blockReason?: 'too_large' | 'open_questions'
-  splitSuggestion?: string[][]  // files grouped by top-level directory, only when blocked
+  splitSuggestion?: string[][] // files grouped by top-level directory, only when blocked
 }
 
 export interface Session {

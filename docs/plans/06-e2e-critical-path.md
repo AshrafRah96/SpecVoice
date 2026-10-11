@@ -1,6 +1,6 @@
 # End-to-End Critical Path Test
 
-This is a manual smoke test, not an automated suite. Run it against `npm run dev` with a real `.env.local`. The goal is to confirm that the entire data path from session creation to `buildStatus: 'ready'` works exactly as designed — no mocking, no stubs, real HTTP calls.
+This is a manual smoke test, not an automated suite. Run it against `npm run dev` with a real `.env.local`. The goal is to confirm that the entire data path from session creation to `buildStatus: 'ready'` works exactly as designed — no mocking, no stubs, real HTTP calls. The Playwright browser coverage lives in `tests/e2e/` and is run with `npm run test:e2e`.
 
 You need: the dev server running, `ELEVENLABS_API_KEY` and `GITHUB_TOKEN` set, and a public GitHub repo URL handy for the session.
 
@@ -22,7 +22,7 @@ If this returns an error, stop. The session store or Zod validation is broken an
 
 ## Step 2 — Open the SSE stream
 
-In a second terminal, keep this running for the entire test. Every mutation from here on should produce an event in this stream.
+In a second terminal, keep this running for the entire test. Every session mutation from here on should produce an event in this stream; read-only tools are expected to return without an SSE update.
 
 ```bash
 curl -N http://localhost:3000/api/sessions/<id>/events
@@ -34,7 +34,7 @@ Expected on connect: one immediate `session_updated` event with the full session
 
 ## Step 3 — Exercise the tool webhooks
 
-These simulate exactly what ElevenLabs calls during a conversation. Each one should produce a `session_updated` event in the SSE stream within a second.
+These simulate exactly what ElevenLabs calls during a conversation. Each mutating tool should produce a `session_updated` event in the SSE stream within a second.
 
 **list_files**
 ```bash
@@ -56,7 +56,7 @@ Expected: file contents string. SSE stream should fire a `session_updated` event
 ```bash
 curl -s -X POST http://localhost:3000/api/tools/search-code \
   -H "Content-Type: application/json" \
-  -d '{"session_id": "<id>", "query": "session", "maxResults": 3}' | jq
+  -d '{"session_id": "<id>", "query": "session", "max_results": 3}' | jq
 ```
 Expected: array of matches. No session mutation, no SSE event.
 
@@ -102,7 +102,7 @@ Expected: `specOutput` string — a markdown document. SSE fires `session_update
 curl -s http://localhost:3000/api/sessions/<id> | jq
 ```
 
-At this point the session should have: one entry in `filesRead`, one decision in `decisions`, one open question in `openQuestions`, `specOutput` set to a non-empty markdown string, and `buildStatus` still `"idle"`.
+At this point the session should have: one entry in `filesRead`, one decision in `decisions`, one open question in `openQuestions`, `specOutput` set to a non-empty markdown string, and `buildStatus` set to `"ready"` because a generated spec is actionable.
 
 If any of these are missing, the relevant tool webhook has a bug.
 

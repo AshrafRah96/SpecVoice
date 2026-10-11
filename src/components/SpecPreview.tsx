@@ -12,7 +12,7 @@ export function SpecPreview({ session }: Props) {
   const [activeTab, setActiveTab] = useState<'decisions' | 'spec'>('decisions')
 
   const reversedDecisions = useMemo(
-    () => session ? [...session.decisions].reverse() : [],
+    () => (session ? [...session.decisions].reverse() : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [session?.decisions]
   )
@@ -81,9 +81,7 @@ export function SpecPreview({ session }: Props) {
                       'animate-fadeSlideIn'
                     )}
                   >
-                    <span className="text-xs text-foreground flex-1 truncate mr-3">
-                      {d.summary}
-                    </span>
+                    <span className="text-xs text-foreground flex-1 truncate mr-3">{d.summary}</span>
                     {d.relevantFiles.length > 0 && (
                       <span className="text-xs text-muted-foreground flex-none whitespace-nowrap">
                         {d.relevantFiles.length} file{d.relevantFiles.length !== 1 ? 's' : ''}

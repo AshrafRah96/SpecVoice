@@ -60,10 +60,11 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
 
   const webCallActive = conversation.status === 'connected'
 
-  const orbState: 'idle' | 'listening' | 'talking' =
-    conversation.isSpeaking ? 'talking'
-    : webCallActive ? 'listening'
-    : 'idle'
+  const orbState: 'idle' | 'listening' | 'talking' = conversation.isSpeaking
+    ? 'talking'
+    : webCallActive
+      ? 'listening'
+      : 'idle'
 
   return (
     <div className="flex flex-col h-full">
@@ -80,9 +81,7 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
       <div className="flex flex-col gap-5 p-5 flex-1 overflow-y-auto">
         {/* Repo input */}
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-medium tracking-widest uppercase text-muted-foreground">
-            Repository URL
-          </label>
+          <label className="text-xs font-medium tracking-widest uppercase text-muted-foreground">Repository URL</label>
           <input
             type="url"
             value={repoUrl}
@@ -111,9 +110,7 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
         {/* Session status */}
         {session && (
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1">
-              Session
-            </span>
+            <span className="text-xs font-medium tracking-widest uppercase text-muted-foreground mb-1">Session</span>
             <StatusRow label="Status" value={webCallActive ? 'In Call' : 'Ended'} />
             {session.buildStatus !== 'idle' && (
               <StatusRow label="Build" value={BUILD_LABELS[session.buildStatus] ?? session.buildStatus} />
@@ -125,9 +122,11 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
               <div className="flex justify-between items-center py-0.5 text-xs">
                 <span className="text-muted-foreground">Reading</span>
                 <span className="font-mono text-foreground/70 truncate ml-3 text-right max-w-[140px]">
-                  {session.filesRead.length > 0
-                    ? session.filesRead[session.filesRead.length - 1].path.split('/').pop()
-                    : <span className="italic text-muted-foreground animate-pulse">exploring…</span>}
+                  {session.filesRead.length > 0 ? (
+                    session.filesRead[session.filesRead.length - 1].path.split('/').pop()
+                  ) : (
+                    <span className="italic text-muted-foreground animate-pulse">exploring…</span>
+                  )}
                 </span>
               </div>
             )}
@@ -176,7 +175,10 @@ export function SessionControls({ session, isConnected, error, onCreateSession }
         {session && !session.specOutput && (
           <div className="mt-auto pt-4 border-t border-border/50">
             <p className="text-xs text-muted-foreground mb-1">Dial in with session ID:</p>
-            <code data-testid="session-id" className="block text-xs rounded-md px-2 py-1.5 font-mono bg-muted text-primary break-all">
+            <code
+              data-testid="session-id"
+              className="block text-xs rounded-md px-2 py-1.5 font-mono bg-muted text-primary break-all"
+            >
               {session.id}
             </code>
           </div>

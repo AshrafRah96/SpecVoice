@@ -2,11 +2,11 @@ import type { Session, ComplexityAssessment } from '@/lib/session/types'
 
 export type SizeEstimator = (session: Session) => number
 
-export const filecountEstimator: SizeEstimator = (session) => session.filesRead.length * 50
+export const filecountEstimator: SizeEstimator = session => session.filesRead.length * 50
 
 const CHARS_PER_LINE = 80
 
-export const charCountEstimator: SizeEstimator = (session) =>
+export const charCountEstimator: SizeEstimator = session =>
   Math.ceil(session.filesRead.reduce((sum, f) => sum + f.characterCount, 0) / CHARS_PER_LINE)
 
 const SIZE_THRESHOLDS = {

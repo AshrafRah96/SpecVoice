@@ -22,9 +22,7 @@ function makeInvalidRequest(url: string): NextRequest {
 }
 
 const echoSchema = z.object({ value: z.string() })
-const echoHandler = createToolHandler(echoSchema, async (_session, input) =>
-  NextResponse.json({ value: input.value })
-)
+const echoHandler = createToolHandler(echoSchema, async (_session, input) => NextResponse.json({ value: input.value }))
 
 describe('createToolHandler', () => {
   it('returns 400 for non-JSON body', async () => {
@@ -104,7 +102,10 @@ describe('createToolHandler', () => {
 
 describe('createCodeToolHandler', () => {
   let deregister: (() => void) | undefined
-  afterEach(() => { deregister?.(); deregister = undefined })
+  afterEach(() => {
+    deregister?.()
+    deregister = undefined
+  })
 
   it('passes a CodeSource to fn alongside session and input', async () => {
     let receivedSource: unknown = null

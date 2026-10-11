@@ -19,15 +19,16 @@ export class BuildPipeline {
     }
 
     const validation = validateBuild(session, this.prereqs)
+
+    if (validation.type === 'failed') {
+      sessionStore.failBuild(sessionId, validation.error)
+      return
+    }
+
     sessionStore.setComplexityAssessment(sessionId, validation.assessment)
 
     if (validation.type === 'blocked') {
       sessionStore.blockBuild(sessionId, validation.assessment)
-      return
-    }
-
-    if (validation.type === 'failed') {
-      sessionStore.failBuild(sessionId, validation.error)
       return
     }
 

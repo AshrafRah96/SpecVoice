@@ -8,9 +8,7 @@ function handleRateLimit(err: unknown): never {
   const e = err as { status?: number; response?: { headers?: Record<string, string> } }
   if (e.status === 403 || e.status === 429) {
     const resetAt = e.response?.headers?.['x-ratelimit-reset']
-    const minutes = resetAt
-      ? Math.ceil((Number(resetAt) * 1000 - Date.now()) / 60000)
-      : 'unknown'
+    const minutes = resetAt ? Math.ceil((Number(resetAt) * 1000 - Date.now()) / 60000) : 'unknown'
     throw new Error(`GitHub rate limit exceeded, try again in ${minutes} minutes`)
   }
   throw err

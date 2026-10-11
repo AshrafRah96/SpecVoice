@@ -43,11 +43,11 @@ The prompt instructs Claude Code to: read `SPEC.md` and `CONTEXT.md`, checkout a
 
 Each `tool_use` block in the NDJSON output emits a `build_progress` SSE event. Phase derived by `phaseFromTool(name)`:
 
-| Tools | Phase |
-|---|---|
-| `Read, Glob, Grep` | `'analyzing'` |
-| `Write, Edit, MultiEdit, NotebookEdit` | `'writing'` |
-| everything else | `'reviewing'` |
+| Tools                                  | Phase         |
+| -------------------------------------- | ------------- |
+| `Read, Glob, Grep`                     | `'analyzing'` |
+| `Write, Edit, MultiEdit, NotebookEdit` | `'writing'`   |
+| everything else                        | `'reviewing'` |
 
 Cloning and PR creation emit `'cloning'` and `'pr'` directly.
 
@@ -60,18 +60,19 @@ Before any build work starts, `runGatedBuild()` calls `assessComplexity(session)
 ### Gate logic
 
 ```typescript
-fileCount    = session.filesRead.length      // files the agent read during the call
+fileCount = session.filesRead.length // files the agent read during the call
 lineEstimate = fileCount * 50
 ```
 
-| `size` | `lineEstimate` | ~files read |
-|---|---|---|
-| `small` | < 500 | < 10 |
-| `medium` | < 2000 | < 40 |
-| `large` | < 5000 | < 100 |
-| `too_large` | ≥ 5000 | ≥ 100 |
+| `size`      | `lineEstimate` | ~files read |
+| ----------- | -------------- | ----------- |
+| `small`     | < 500          | < 10        |
+| `medium`    | < 2000         | < 40        |
+| `large`     | < 5000         | < 100       |
+| `too_large` | ≥ 5000         | ≥ 100       |
 
 **Blocked when** either condition is true:
+
 - `size === 'too_large'`
 - `session.openQuestions.length > 0`
 
@@ -82,9 +83,7 @@ When blocked, `buildStatus` resets to `'ready'` (not `'idle'` — the spec still
 Only populated when `blockReason === 'too_large'`. Groups the relevant files from all decisions by top-level directory:
 
 ```typescript
-splitSuggestion = session.decisions
-  .flatMap(d => d.relevantFiles)
-  .groupBy(path => path.split('/')[0])  // top-level dir
+splitSuggestion = session.decisions.flatMap(d => d.relevantFiles).groupBy(path => path.split('/')[0]) // top-level dir
 ```
 
 This gives the developer a suggested way to split the spec into smaller, independently buildable pieces.
@@ -101,7 +100,7 @@ interface ComplexityAssessment {
   size: 'small' | 'medium' | 'large' | 'too_large'
   blocked: boolean
   blockReason?: 'too_large' | 'open_questions'
-  splitSuggestion?: string[][]   // files grouped by top-level directory
+  splitSuggestion?: string[][] // files grouped by top-level directory
 }
 ```
 
@@ -111,10 +110,10 @@ interface ComplexityAssessment {
 
 Enforced in order before any build work:
 
-| Check | Response |
-|---|---|
+| Check                                | Response                                        |
+| ------------------------------------ | ----------------------------------------------- |
 | `session.buildStatus === 'building'` | `409 { error: "Build already in progress..." }` |
-| `!session.specOutput` | `400 { error: "No spec to build from." }` |
+| `!session.specOutput`                | `400 { error: "No spec to build from." }`       |
 
 `buildStatus` is set to `'building'` synchronously — before the 202 is returned. This ensures the 409 guard works correctly if a second request arrives before the async build resolves.
 
@@ -158,9 +157,9 @@ The `session_updated` event always carries the authoritative state. `build_compl
 
 ## Common mistakes
 
-| Wrong | Correct |
-|---|---|
-| `setBuildStatus('error')` | `setBuildStatus('failed')` — `'error'` is not in `BuildStatus` |
-| `buildStatus = 'idle'` after a complexity block | `buildStatus = 'ready'` — the spec still exists |
+| Wrong                                               | Correct                                                                                                           |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `setBuildStatus('error')`                           | `setBuildStatus('failed')` — `'error'` is not in `BuildStatus`                                                    |
+| `buildStatus = 'idle'` after a complexity block     | `buildStatus = 'ready'` — the spec still exists                                                                   |
 | Call the Anthropic API directly for code generation | Use `claude -p ... --output-format stream-json` CLI in headless mode — never import `anthropic` in the build path |
-| Skip the `finally` cleanup for the temp dir | Always clean up — failed clones leave large directories in `os.tmpdir()` |
+| Skip the `finally` cleanup for the temp dir         | Always clean up — failed clones leave large directories in `os.tmpdir()`                                          |

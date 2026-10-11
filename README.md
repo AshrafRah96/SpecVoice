@@ -2,7 +2,7 @@
 
 A code-aware voice agent on ElevenLabs Conversational AI. Joins phone calls or web conversations as a senior engineer, reads a GitHub repo during the call, and outputs a structured PR spec. After the call, a build pipeline uses Claude Code in headless mode to implement the spec and open a draft PR.
 
-**Stack:** Next.js 14 App Router · TypeScript · ElevenLabs Conversational AI · Anthropic Claude · Octokit · Tailwind + shadcn/ui · Vitest · Playwright
+**Stack:** Next.js 16 App Router · TypeScript · ElevenLabs Conversational AI · Anthropic Claude · Octokit · Tailwind + shadcn/ui · Vitest · Playwright
 
 ---
 
@@ -10,7 +10,7 @@ A code-aware voice agent on ElevenLabs Conversational AI. Joins phone calls or w
 
 ### 1. Prerequisites
 
-- Node.js 18+
+- Node.js 20.19+
 - An [ElevenLabs](https://elevenlabs.io) account (free tier works for testing)
 - An [Anthropic](https://console.anthropic.com) API key (for the post-call build pipeline)
 - A GitHub personal access token (optional — needed for private repos and higher rate limits)
@@ -34,15 +34,15 @@ Copy the example file and fill in each value:
 cp .env.local.example .env.local
 ```
 
-| Variable | Required | Description |
-|---|---|---|
-| `ELEVENLABS_API_KEY` | Yes | Found in ElevenLabs → Profile → API Keys |
-| `ELEVENLABS_AGENT_ID` | After step 5 | Filled automatically by `setup-agent.ts` output |
-| `NEXT_PUBLIC_ELEVENLABS_AGENT_ID` | After step 5 | Same value as above — needed for the browser web-call widget |
-| `NEXT_PUBLIC_APP_URL` | Yes | Your public URL (ngrok tunnel for local dev, e.g. `https://abc123.ngrok-free.app`) |
-| `GITHUB_TOKEN` | Recommended | Personal access token with `repo` read scope |
-| `ANTHROPIC_API_KEY` | Yes (build pipeline) | Used by Claude Code CLI in the post-call build step |
-| `ELEVENLABS_WEBHOOK_SECRET` | Recommended | HMAC secret for verifying ElevenLabs webhook signatures |
+| Variable                          | Required             | Description                                                                        |
+| --------------------------------- | -------------------- | ---------------------------------------------------------------------------------- |
+| `ELEVENLABS_API_KEY`              | Yes                  | Found in ElevenLabs → Profile → API Keys                                           |
+| `ELEVENLABS_AGENT_ID`             | After step 5         | Filled automatically by `setup-agent.ts` output                                    |
+| `NEXT_PUBLIC_ELEVENLABS_AGENT_ID` | After step 5         | Same value as above — needed for the browser web-call widget                       |
+| `NEXT_PUBLIC_APP_URL`             | Yes                  | Your public URL (ngrok tunnel for local dev, e.g. `https://abc123.ngrok-free.app`) |
+| `GITHUB_TOKEN`                    | Recommended          | Personal access token with `repo` read scope                                       |
+| `ANTHROPIC_API_KEY`               | Yes (build pipeline) | Used by Claude Code CLI in the post-call build step                                |
+| `ELEVENLABS_WEBHOOK_SECRET`       | Recommended          | HMAC secret for verifying ElevenLabs webhook signatures                            |
 
 > **Important for local development:** `NEXT_PUBLIC_APP_URL` must be your ngrok tunnel URL, not `localhost`. ElevenLabs calls your tool webhooks over the internet — localhost is unreachable from their servers.
 
@@ -125,10 +125,15 @@ To confirm webhooks are flowing, watch the ngrok inspector at `http://localhost:
 npm run dev            # start dev server
 npm run build          # production build
 npm run lint           # lint
+npm run typecheck      # TypeScript check
+npm run format:check   # Prettier check
 npm test               # vitest unit tests
 npm run test:e2e       # Playwright E2E tests (requires dev server running)
+npm run verify         # format, typecheck, lint, unit tests, and production build
 npx tsx src/scripts/setup-agent.ts   # create/update ElevenLabs agent
 ```
+
+The supported runtime is Node.js 20.19 or newer. `.nvmrc` pins the CI and local baseline.
 
 ---
 
@@ -161,12 +166,14 @@ No vector database, no embeddings, no RAG. The agent reads files on demand via t
 
 **Session stuck in "In Call" after the call ends**
 The post-call webhook didn't fire. Check:
+
 1. The webhook URL in ElevenLabs matches your current ngrok URL
 2. `ELEVENLABS_WEBHOOK_SECRET` in `.env.local` matches the HMAC secret in ElevenLabs
 3. The dev server was restarted after adding the secret
 4. ngrok inspector (`localhost:4040`) shows a POST to `/api/agent/post-call`
 
 **Agent connects but no audio**
+
 1. Check the browser tab isn't muted (right-click tab → Unmute)
 2. Check system audio output device
 3. Click anywhere on the page after starting the call (browsers sometimes suspend audio context until a user gesture)
@@ -175,6 +182,7 @@ The post-call webhook didn't fire. Check:
 The agent's tool URLs point to the wrong host. Re-run `setup-agent.ts` after updating `NEXT_PUBLIC_APP_URL` in `.env.local`.
 
 **ngrok URL changed**
+
 1. Update `NEXT_PUBLIC_APP_URL` in `.env.local`
 2. Re-run `npx tsx src/scripts/setup-agent.ts`
 3. Update the post-call webhook URL in ElevenLabs dashboard manually

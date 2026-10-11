@@ -11,9 +11,7 @@ if (!AGENT_ID) {
   process.exit(1)
 }
 
-const ws = new WebSocket(
-  `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${AGENT_ID}`
-)
+const ws = new WebSocket(`wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${AGENT_ID}`)
 
 let audioFrames = 0
 const jsonMessages: string[] = []
@@ -34,11 +32,13 @@ function sendSilentPCMAsBase64() {
 
 ws.on('open', () => {
   console.log('[WS] opened')
-  ws.send(JSON.stringify({
-    type: 'conversation_initiation_client_data',
-    dynamic_variables: { session_id: 'test-123' },
-    conversation_config_override: { conversation: { text_only: false } },
-  }))
+  ws.send(
+    JSON.stringify({
+      type: 'conversation_initiation_client_data',
+      dynamic_variables: { session_id: 'test-123' },
+      conversation_config_override: { conversation: { text_only: false } },
+    })
+  )
 })
 
 ws.on('message', (data: Buffer, isBinary: boolean) => {
@@ -83,4 +83,6 @@ ws.on('close', (code: number, reason: Buffer) => {
   console.log(`=== FINAL: ${audioFrames} audio frames | msgs: ${jsonMessages.join(', ')} ===`)
 })
 
-setTimeout(() => { if (ws.readyState !== ws.CLOSED) ws.close() }, 25000)
+setTimeout(() => {
+  if (ws.readyState !== ws.CLOSED) ws.close()
+}, 25000)

@@ -8,11 +8,7 @@ export function isBinary(buffer: Buffer): boolean {
   return false
 }
 
-export function formatNumberedLines(
-  lines: string[],
-  totalLines: number,
-  startLine = 1
-): string[] {
+export function formatNumberedLines(lines: string[], totalLines: number, startLine = 1): string[] {
   const width = String(totalLines).length
   return lines.map((line, i) => {
     const num = String(startLine + i).padStart(width, ' ')
@@ -21,8 +17,5 @@ export function formatNumberedLines(
 }
 
 export function buildSearchContext(lines: string[], i: number): string[] {
-  return [
-    ...lines.slice(Math.max(0, i - 2), i),
-    ...lines.slice(i + 1, Math.min(lines.length, i + 3)),
-  ]
+  return [...lines.slice(Math.max(0, i - 2), i), ...lines.slice(i + 1, Math.min(lines.length, i + 3))]
 }

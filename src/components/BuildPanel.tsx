@@ -26,9 +26,7 @@ export function BuildPanel({ session, buildLog, onTriggerBuild, error }: Props) 
 
   return (
     <div className="p-5 flex flex-col gap-4">
-      <h2 className="text-xs font-medium tracking-widest uppercase text-muted-foreground">
-        Build
-      </h2>
+      <h2 className="text-xs font-medium tracking-widest uppercase text-muted-foreground">Build</h2>
 
       {/* Ready to build */}
       {buildStatus === 'ready' && (
@@ -100,9 +98,7 @@ export function BuildPanel({ session, buildLog, onTriggerBuild, error }: Props) 
 
       {/* Idle */}
       {buildStatus === 'idle' && (
-        <p className="text-xs text-muted-foreground">
-          Build will be available once the spec is generated.
-        </p>
+        <p className="text-xs text-muted-foreground">Build will be available once the spec is generated.</p>
       )}
     </div>
   )

@@ -15,7 +15,10 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
   // fixture instead of GitHub — avoids requiring a GitHub token with repo access.
   const fixturePath = path.resolve('./tests/fixtures/sample-repo')
   await page.route('**/api/sessions', async route => {
-    if (route.request().method() !== 'POST') { await route.continue(); return }
+    if (route.request().method() !== 'POST') {
+      await route.continue()
+      return
+    }
     await route.continue({ postData: JSON.stringify({ repoLocalPath: fixturePath }) })
   })
 
@@ -29,7 +32,9 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
   expect(sessionId).toBeTruthy()
 
   // ── 3. Confirm SSE is live ───────────────────────────────────────────────
-  await expect(page.locator('[data-testid="sse-status"]')).toHaveText('connected', { timeout: 5000 })
+  await expect(page.locator('[data-testid="sse-status"]')).toHaveText('connected', {
+    timeout: 5000,
+  })
 
   // ── 4. Simulate agent reading a file ────────────────────────────────────
   const readFileRes = await request.post('/api/tools/read-file', {
@@ -38,7 +43,9 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
   expect(readFileRes.status(), `read-file failed: ${await readFileRes.text()}`).toBe(200)
 
   // FileExplorer panel should update via SSE without a page reload.
-  await expect(page.locator('[data-testid="file-explorer"]')).toContainText('README.md', { timeout: 5000 })
+  await expect(page.locator('[data-testid="file-explorer"]')).toContainText('README.md', {
+    timeout: 5000,
+  })
 
   // ── 5. Simulate agent saving a decision ─────────────────────────────────
   // NOTE: snake_case field names — this is what the Zod schema requires.
@@ -53,10 +60,9 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
   })
 
   // SpecPreview shows decisions in the Decisions tab (default tab).
-  await expect(page.locator('[data-testid="spec-preview"]')).toContainText(
-    'Use Postgres for session storage',
-    { timeout: 5000 }
-  )
+  await expect(page.locator('[data-testid="spec-preview"]')).toContainText('Use Postgres for session storage', {
+    timeout: 5000,
+  })
 
   // ── 6. Generate the spec ─────────────────────────────────────────────────
   await request.post('/api/tools/generate-spec', {
@@ -71,11 +77,9 @@ test('critical path — session creation to buildStatus ready', async ({ page, r
   // Sign the request when ELEVENLABS_WEBHOOK_SECRET is configured on the server;
   // otherwise the route returns 401 and buildStatus never becomes 'ready'.
   const webhookSecret = loadEnvVar('ELEVENLABS_WEBHOOK_SECRET')
-  const { headers: postCallHeaders, data: postCallBody } = buildSignedPostCallRequest(
-    sessionId!,
-    webhookSecret,
-    { callDurationSecs: 142 }
-  )
+  const { headers: postCallHeaders, data: postCallBody } = buildSignedPostCallRequest(sessionId!, webhookSecret, {
+    callDurationSecs: 142,
+  })
   await request.post('/api/agent/post-call', { headers: postCallHeaders, data: postCallBody })
 
   // The "Build It" button should now be visible.

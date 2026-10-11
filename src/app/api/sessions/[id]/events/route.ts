@@ -3,10 +3,7 @@ import { sessionStore } from '@/lib/session/store'
 import { sessionNotFound } from '@/lib/api/helpers'
 import type { SessionEvent } from '@/lib/session/types'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const session = sessionStore.getSession(id)
   if (!session) return sessionNotFound(id)

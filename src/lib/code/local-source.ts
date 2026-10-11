@@ -13,8 +13,7 @@ export class LocalCodeSource implements CodeSource {
     const resolved = path.resolve(rootPath)
     if (!existsSync(resolved) || !statSync(resolved).isDirectory()) {
       throw new Error(
-        `Local repo path is not a directory: ${rootPath}. ` +
-          'Check that the path exists and is accessible.'
+        `Local repo path is not a directory: ${rootPath}. ` + 'Check that the path exists and is accessible.'
       )
     }
     this.rootPath = resolved

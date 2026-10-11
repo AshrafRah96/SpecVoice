@@ -17,8 +17,7 @@ export function createToolHandler<S extends z.ZodRawShape>(
 ): (req: NextRequest) => Promise<NextResponse> {
   return async (req: NextRequest) => {
     const body = await parseRequestBody(req)
-    if (body === null)
-      return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 })
+    if (body === null) return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 })
     // Parse routing key and domain input separately so generics stay clean.
     const routing = routingSchema.safeParse(body)
     if (!routing.success) return validationError(routing.error.issues)
@@ -38,7 +37,5 @@ export function createCodeToolHandler<S extends z.ZodRawShape>(
   schema: z.ZodObject<S>,
   fn: CodeToolFn<z.infer<z.ZodObject<S>>>
 ): (req: NextRequest) => Promise<NextResponse> {
-  return createToolHandler(schema, (session, input) =>
-    fn(session, resolveCodeSource(session), input)
-  )
+  return createToolHandler(schema, (session, input) => fn(session, resolveCodeSource(session), input))
 }

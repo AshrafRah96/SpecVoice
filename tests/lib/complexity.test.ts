@@ -21,9 +21,7 @@ describe('assessComplexity', () => {
 
   it('session with open questions is blocked with reason open_questions', () => {
     const session = makeSession({
-      openQuestions: [
-        { id: 'q1', question: 'Migrate data?', context: '', timestamp: '' },
-      ],
+      openQuestions: [{ id: 'q1', question: 'Migrate data?', context: '', timestamp: '' }],
     })
     const result = assessComplexity(session)
     expect(result.blocked).toBe(true)
@@ -60,7 +58,9 @@ describe('assessComplexity', () => {
   })
 
   it('injected estimator returning large value makes session too_large', () => {
-    const session = makeSession({ filesRead: [{ path: 'src/a.ts', timestamp: '', characterCount: 1 }] })
+    const session = makeSession({
+      filesRead: [{ path: 'src/a.ts', timestamp: '', characterCount: 1 }],
+    })
     const result = assessComplexity(session, () => 99999)
     expect(result.size).toBe('too_large')
     expect(result.blocked).toBe(true)
@@ -69,7 +69,9 @@ describe('assessComplexity', () => {
 
   it('injected estimator returning small value keeps session small', () => {
     const filesRead = Array.from({ length: 200 }, (_, i) => ({
-      path: `src/file${i}.ts`, timestamp: '', characterCount: 10000,
+      path: `src/file${i}.ts`,
+      timestamp: '',
+      characterCount: 10000,
     }))
     const session = makeSession({ filesRead })
     const result = assessComplexity(session, () => 1)
@@ -91,7 +93,9 @@ describe('assessComplexity', () => {
 
   it('charCountEstimator correctly classifies many tiny files as small', () => {
     const filesRead = Array.from({ length: 101 }, (_, i) => ({
-      path: `config/file${i}.json`, timestamp: '', characterCount: 10,
+      path: `config/file${i}.json`,
+      timestamp: '',
+      characterCount: 10,
     }))
     const session = makeSession({ filesRead })
     // filecountEstimator: 101 * 50 = 5050 → too_large

@@ -31,59 +31,67 @@ export function useSession(): UseSessionReturn {
   const retryDelayRef = useRef(1000)
 
   const connectSSE = useCallback((id: string) => {
-    if (esRef.current) esRef.current.close()
+    function openConnection(): void {
+      if (esRef.current) esRef.current.close()
 
-    const es = new EventSource(`/api/sessions/${id}/events`)
-    esRef.current = es
+      const es = new EventSource(`/api/sessions/${id}/events`)
+      esRef.current = es
 
-    es.onopen = () => {
-      setIsConnected(true)
-      setError(null)
-      retryDelayRef.current = 1000
-    }
+      es.onopen = () => {
+        setIsConnected(true)
+        setError(null)
+        retryDelayRef.current = 1000
+      }
 
-    es.onmessage = (event: MessageEvent) => {
-      try {
-        const sseEvent = JSON.parse(event.data) as SessionEvent
-        switch (sseEvent.type) {
-          case 'session_updated':
-            setSession(sseEvent.session)
-            break
-          case 'call_ended':
-            // session_updated follows immediately with the updated session — let it carry the state
-            break
-          case 'build_started':
-            setBuildLog([])  // clear stale log from previous builds
-            break
-          case 'build_progress':
-            setBuildLog(prev => [
-              ...prev,
-              { phase: sseEvent.phase, detail: sseEvent.detail, timestamp: new Date().toISOString() },
-            ])
-            break
-          case 'build_complete':
-          case 'build_blocked':
-            // session_updated carries the final session state (buildStatus, prUrl, complexityAssessment)
-            break
-          case 'build_failed':
-            // Surface the error so BuildPanel can display it instead of the generic fallback
-            setError(sseEvent.error)
-            break
+      es.onmessage = (event: MessageEvent) => {
+        try {
+          const sseEvent = JSON.parse(event.data) as SessionEvent
+          switch (sseEvent.type) {
+            case 'session_updated':
+              setSession(sseEvent.session)
+              break
+            case 'call_ended':
+              // session_updated follows immediately with the updated session — let it carry the state
+              break
+            case 'build_started':
+              setBuildLog([]) // clear stale log from previous builds
+              break
+            case 'build_progress':
+              setBuildLog(prev => [
+                ...prev,
+                {
+                  phase: sseEvent.phase,
+                  detail: sseEvent.detail,
+                  timestamp: new Date().toISOString(),
+                },
+              ])
+              break
+            case 'build_complete':
+            case 'build_blocked':
+              // session_updated carries the final session state (buildStatus, prUrl, complexityAssessment)
+              break
+            case 'build_failed':
+              // Surface the error so BuildPanel can display it instead of the generic fallback
+              setError(sseEvent.error)
+              break
+          }
+        } catch {
+          // malformed SSE payload — ignore
         }
-      } catch {
-        // malformed SSE payload — ignore
+      }
+
+      es.onerror = () => {
+        setIsConnected(false)
+        es.close()
+        // exponential backoff reconnect, cap at 30s
+        retryTimerRef.current = setTimeout(() => {
+          retryDelayRef.current = Math.min(retryDelayRef.current * 2, 30000)
+          openConnection()
+        }, retryDelayRef.current)
       }
     }
 
-    es.onerror = () => {
-      setIsConnected(false)
-      es.close()
-      // exponential backoff reconnect, cap at 30s
-      retryTimerRef.current = setTimeout(() => {
-        retryDelayRef.current = Math.min(retryDelayRef.current * 2, 30000)
-        connectSSE(id)
-      }, retryDelayRef.current)
-    }
+    openConnection()
   }, [])
 
   useEffect(() => {
@@ -107,7 +115,7 @@ export function useSession(): UseSessionReturn {
         const body = await res.json().catch(() => ({}))
         throw new Error(body?.error ?? `Failed to create session (${res.status})`)
       }
-      const data = await res.json() as { session: Session }
+      const data = (await res.json()) as { session: Session }
       setSession(data.session)
       setSessionId(data.session.id)
     } catch (err) {

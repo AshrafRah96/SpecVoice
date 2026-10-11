@@ -74,11 +74,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ignored: 'unknown session' }, { status: 200 })
   }
 
-  sessionStore.endCall(
-    sessionId,
-    data.metadata.call_duration_secs,
-    JSON.stringify(data.transcript)
-  )
+  sessionStore.endCall(sessionId, data.metadata.call_duration_secs, JSON.stringify(data.transcript))
 
   return NextResponse.json({ received: true }, { status: 200 })
 }

@@ -101,11 +101,11 @@ Triggers the post-call build pipeline. Returns 202 immediately; the build runs i
 
 **Errors:**
 
-| Status | Condition |
-|---|---|
-| `400` | `session.specOutput` is null — no spec to build from |
-| `404` | Session not found |
-| `409` | `session.buildStatus === 'building'` — build already in progress |
+| Status | Condition                                                        |
+| ------ | ---------------------------------------------------------------- |
+| `400`  | `session.specOutput` is null — no spec to build from             |
+| `404`  | Session not found                                                |
+| `409`  | `session.buildStatus === 'building'` — build already in progress |
 
 `buildStatus` is set to `'building'` synchronously before the 202 is returned. Subsequent SSE events arrive asynchronously.
 
@@ -321,9 +321,7 @@ Called by ElevenLabs at the end of every conversation. Not called from the brows
     "metadata": {
       "call_duration_secs": 183
     },
-    "transcript": [
-      { "role": "user", "message": "Let's add a caching layer", "time_in_call_secs": 12 }
-    ],
+    "transcript": [{ "role": "user", "message": "Let's add a caching layer", "time_in_call_secs": 12 }],
     "conversation_initiation_client_data": {
       "dynamic_variables": {
         "session_id": "sess_abc123"
@@ -488,8 +486,8 @@ The canonical type definitions are in [src/lib/session/types.ts](../src/lib/sess
 
 ```typescript
 type SessionStatus = 'active' | 'complete' | 'error'
-type BuildStatus   = 'idle' | 'ready' | 'building' | 'complete' | 'failed'
-type BuildPhase    = 'analyzing' | 'writing' | 'reviewing' | 'cloning' | 'pr'
+type BuildStatus = 'idle' | 'ready' | 'building' | 'complete' | 'failed'
+type BuildPhase = 'analyzing' | 'writing' | 'reviewing' | 'cloning' | 'pr'
 ```
 
 > `'error'` is not a valid `BuildStatus`. Use `'failed'`. This is a common mistake — see [DX Audit](./DX-AUDIT.md).

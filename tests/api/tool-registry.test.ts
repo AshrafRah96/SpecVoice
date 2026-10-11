@@ -27,11 +27,14 @@ describe('toolRegistry.dispatch — unknown tool', () => {
 describe('toolRegistry.dispatch — save-decision', () => {
   it('stores a decision and returns it', async () => {
     const session = sessionStore.createSession()
-    const res = await toolRegistry.dispatch('save-decision', makeRequest({
-      session_id: session.id,
-      summary: 'Use Postgres',
-      rationale: 'ACID transactions',
-    }))
+    const res = await toolRegistry.dispatch(
+      'save-decision',
+      makeRequest({
+        session_id: session.id,
+        summary: 'Use Postgres',
+        rationale: 'ACID transactions',
+      })
+    )
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.decision.summary).toBe('Use Postgres')
@@ -40,10 +43,13 @@ describe('toolRegistry.dispatch — save-decision', () => {
 
   it('returns 400 when summary is missing', async () => {
     const session = sessionStore.createSession()
-    const res = await toolRegistry.dispatch('save-decision', makeRequest({
-      session_id: session.id,
-      rationale: 'r',
-    }))
+    const res = await toolRegistry.dispatch(
+      'save-decision',
+      makeRequest({
+        session_id: session.id,
+        rationale: 'r',
+      })
+    )
     expect(res.status).toBe(400)
   })
 })
@@ -51,10 +57,13 @@ describe('toolRegistry.dispatch — save-decision', () => {
 describe('toolRegistry.dispatch — flag-question', () => {
   it('stores a question and returns it', async () => {
     const session = sessionStore.createSession()
-    const res = await toolRegistry.dispatch('flag-question', makeRequest({
-      session_id: session.id,
-      question: 'Should we use Redis?',
-    }))
+    const res = await toolRegistry.dispatch(
+      'flag-question',
+      makeRequest({
+        session_id: session.id,
+        question: 'Should we use Redis?',
+      })
+    )
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.question.question).toBe('Should we use Redis?')
@@ -63,10 +72,13 @@ describe('toolRegistry.dispatch — flag-question', () => {
 
   it('defaults context to empty string when omitted', async () => {
     const session = sessionStore.createSession()
-    await toolRegistry.dispatch('flag-question', makeRequest({
-      session_id: session.id,
-      question: 'What auth?',
-    }))
+    await toolRegistry.dispatch(
+      'flag-question',
+      makeRequest({
+        session_id: session.id,
+        question: 'What auth?',
+      })
+    )
     expect(sessionStore.getSession(session.id)!.openQuestions[0].context).toBe('')
   })
 })
@@ -74,14 +86,16 @@ describe('toolRegistry.dispatch — flag-question', () => {
 describe('toolRegistry.dispatch — generate-spec', () => {
   it('generates and stores spec, sets buildStatus to ready', async () => {
     const session = sessionStore.createSession({
-      decisions: [{
-        id: 'd-1',
-        summary: 'Add rate limiting',
-        rationale: 'Prevent abuse',
-        alternativesConsidered: [],
-        relevantFiles: [],
-        timestamp: new Date().toISOString(),
-      }],
+      decisions: [
+        {
+          id: 'd-1',
+          summary: 'Add rate limiting',
+          rationale: 'Prevent abuse',
+          alternativesConsidered: [],
+          relevantFiles: [],
+          timestamp: new Date().toISOString(),
+        },
+      ],
     })
     const res = await toolRegistry.dispatch('generate-spec', makeRequest({ session_id: session.id }))
     expect(res.status).toBe(200)
@@ -96,7 +110,10 @@ describe('toolRegistry.dispatch — generate-spec', () => {
 
 describe('toolRegistry.dispatch — list-files', () => {
   let deregister: (() => void) | undefined
-  afterEach(() => { deregister?.(); deregister = undefined })
+  afterEach(() => {
+    deregister?.()
+    deregister = undefined
+  })
 
   it('returns files from the code source', async () => {
     const session = sessionStore.createSession()
@@ -111,15 +128,21 @@ describe('toolRegistry.dispatch — list-files', () => {
 
 describe('toolRegistry.dispatch — read-file', () => {
   let deregister: (() => void) | undefined
-  afterEach(() => { deregister?.(); deregister = undefined })
+  afterEach(() => {
+    deregister?.()
+    deregister = undefined
+  })
 
   it('returns file content and records the read', async () => {
     const session = sessionStore.createSession()
     deregister = registerCodeSource(session.id, new InMemoryCodeSource({ 'src/a.ts': 'export const x = 1' }))
-    const res = await toolRegistry.dispatch('read-file', makeRequest({
-      session_id: session.id,
-      path: 'src/a.ts',
-    }))
+    const res = await toolRegistry.dispatch(
+      'read-file',
+      makeRequest({
+        session_id: session.id,
+        path: 'src/a.ts',
+      })
+    )
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.content.content).toContain('export const x = 1')
@@ -129,15 +152,21 @@ describe('toolRegistry.dispatch — read-file', () => {
 
 describe('toolRegistry.dispatch — search-code', () => {
   let deregister: (() => void) | undefined
-  afterEach(() => { deregister?.(); deregister = undefined })
+  afterEach(() => {
+    deregister?.()
+    deregister = undefined
+  })
 
   it('returns matching search results', async () => {
     const session = sessionStore.createSession()
     deregister = registerCodeSource(session.id, new InMemoryCodeSource({ 'src/a.ts': 'export const hello = 1' }))
-    const res = await toolRegistry.dispatch('search-code', makeRequest({
-      session_id: session.id,
-      query: 'hello',
-    }))
+    const res = await toolRegistry.dispatch(
+      'search-code',
+      makeRequest({
+        session_id: session.id,
+        query: 'hello',
+      })
+    )
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(Array.isArray(data.results)).toBe(true)

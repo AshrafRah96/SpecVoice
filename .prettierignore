@@ -1,0 +1,13 @@
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+test-results/
+playwright-report/
+package-lock.json
+next-env.d.ts
+docs/plans/
+docs/system-prompt.md
+.git/

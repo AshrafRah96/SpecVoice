@@ -37,9 +37,7 @@ describe('POST /api/agent/post-call', () => {
     const updated = sessionStore.getSession(session.id)!
     expect(updated.buildStatus).toBe('ready')
     expect(updated.callDurationSecs).toBe(42)
-    expect(updated.transcript).toBe(
-      JSON.stringify([{ role: 'agent', message: 'Hello there.', time_in_call_secs: 0 }])
-    )
+    expect(updated.transcript).toBe(JSON.stringify([{ role: 'agent', message: 'Hello there.', time_in_call_secs: 0 }]))
   })
 
   it('missing session_id returns 200 with ignored message and does not mutate store', async () => {

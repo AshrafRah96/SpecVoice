@@ -5,18 +5,18 @@
 @layer base {
   :root {
     /* Light theme — HSL channel values, consumed as hsl(var(--token)) */
-    --background: 24 5% 95%;         /* outer wrapper — warm off-white base */
-    --foreground: 0 0% 9%;           /* primary text — near black */
+    --background: 24 5% 95%; /* outer wrapper — warm off-white base */
+    --foreground: 0 0% 9%; /* primary text — near black */
 
-    --card: 0 0% 100%;               /* centre/right panels — white */
+    --card: 0 0% 100%; /* centre/right panels — white */
     --card-foreground: 0 0% 9%;
 
-    --sidebar: 24 4% 91%;            /* left panel — one step down from base */
+    --sidebar: 24 4% 91%; /* left panel — one step down from base */
 
     --muted: 0 0% 92%;
     --muted-foreground: 0 0% 45%;
 
-    --primary: 0 0% 6%;              /* CTA buttons — near black */
+    --primary: 0 0% 6%; /* CTA buttons — near black */
     --primary-foreground: 0 0% 98%;
 
     --secondary: 0 0% 93%;

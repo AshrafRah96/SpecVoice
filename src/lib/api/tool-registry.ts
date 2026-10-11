@@ -28,13 +28,10 @@ export const toolRegistry = new ToolRegistry()
 // ── list-files ────────────────────────────────────────────────────────────────
 toolRegistry.register(
   'list-files',
-  createCodeToolHandler(
-    z.object({ path: z.string().optional() }),
-    async (_session, source, input) => {
-      const files = await source.listFiles(input.path)
-      return NextResponse.json({ files })
-    }
-  )
+  createCodeToolHandler(z.object({ path: z.string().optional() }), async (_session, source, input) => {
+    const files = await source.listFiles(input.path)
+    return NextResponse.json({ files })
+  })
 )
 
 // ── read-file ─────────────────────────────────────────────────────────────────
@@ -122,12 +119,9 @@ toolRegistry.register(
 // ── generate-spec ─────────────────────────────────────────────────────────────
 toolRegistry.register(
   'generate-spec',
-  createToolHandler(
-    z.object({}),
-    async (session) => {
-      const spec = generateSpec(session)
-      sessionStore.setSpec(session.id, spec)
-      return NextResponse.json({ spec })
-    }
-  )
+  createToolHandler(z.object({}), async session => {
+    const spec = generateSpec(session)
+    sessionStore.setSpec(session.id, spec)
+    return NextResponse.json({ spec })
+  })
 )

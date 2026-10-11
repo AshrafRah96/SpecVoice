@@ -46,7 +46,7 @@ Fields added to `src/lib/session/types.ts` by this feature:
 ```ts
 callDurationSecs: number | null
 transcript: string | null
-buildStatus: BuildStatus  // 'idle' | 'ready' | 'building' | 'complete' | 'failed'
+buildStatus: BuildStatus // 'idle' | 'ready' | 'building' | 'complete' | 'failed'
 ```
 
 `broadcastEvent(sessionId, event)` is made public by this feature.

@@ -15,12 +15,14 @@ Two complementary test layers verify the full SpecVoice data path:
 1. `POST /api/sessions` → capture `id`. Expect `buildStatus: 'idle'`.
 2. Open SSE stream: `curl -N .../api/sessions/{id}/events` — keep running for the entire test.
 3. Fire tool webhooks in order. Each must include `conversation_initiation_client_data.dynamic_variables.session_id`:
-   - `list_files` — no SSE event (no session mutation).
-   - `read_file` — SSE fires `session_updated` with `filesRead` populated.
-   - `search_code` — no SSE event.
-   - `save_decision` — SSE fires `session_updated` with `decisions` populated.
-   - `flag_question` — SSE fires `session_updated` with `openQuestions` populated.
-   - `generate_spec` — SSE fires `session_updated` with `specOutput` set.
+   - Agent names are `list_files`, `read_file`, `search_code`, `save_decision`, `flag_question`, and `generate_spec`.
+   - Their webhook paths and registry keys are `list-files`, `read-file`, `search-code`, `save-decision`, `flag-question`, and `generate-spec`.
+   - `list_files` / `list-files` — no SSE event (no session mutation).
+   - `read_file` / `read-file` — SSE fires `session_updated` with `filesRead` populated.
+   - `search_code` / `search-code` — no SSE event.
+   - `save_decision` / `save-decision` — SSE fires `session_updated` with `decisions` populated.
+   - `flag_question` / `flag-question` — SSE fires `session_updated` with `openQuestions` populated.
+   - `generate_spec` / `generate-spec` — SSE fires `session_updated` with `specOutput` set.
 4. `GET /api/sessions/{id}` — verify all fields populated.
 5. `POST /api/agent/post-call` with correct payload → `{"received": true}`. SSE fires `call_ended` then `session_updated` with `buildStatus: 'ready'`, `callDurationSecs`, `transcript`.
 6. `POST /api/agent/post-call` with no `session_id` → must return `200 { ignored: '...' }` (graceful no-op, never 4xx).
@@ -52,13 +54,13 @@ All assertions use `{ timeout: 5000 }`. Selectors use `page.locator('[data-testi
 
 These attributes must exist in components or the Playwright test cannot locate elements:
 
-| Attribute | Component |
-|---|---|
-| `session-id` | SessionControls — renders session ID (only visible when `!session.specOutput`) |
-| `sse-status` | SessionControls — SSE connection status text "connected" or "disconnected" |
-| `file-explorer` | FileExplorer root element |
-| `spec-preview` | SpecPreview root element |
-| `build-button` | BuildPanel "Build it" button |
+| Attribute       | Component                                                                      |
+| --------------- | ------------------------------------------------------------------------------ |
+| `session-id`    | SessionControls — renders session ID (only visible when `!session.specOutput`) |
+| `sse-status`    | SessionControls — SSE connection status text "connected" or "disconnected"     |
+| `file-explorer` | FileExplorer root element                                                      |
+| `spec-preview`  | SpecPreview root element                                                       |
+| `build-button`  | BuildPanel "Build it" button                                                   |
 
 ## What is NOT tested
 

@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  escapeCell,
-  categorizeDecision,
-  decisionsTable,
-  classifiers,
-} from '@/lib/session/spec-generator'
+import { escapeCell, categorizeDecision, decisionsTable, classifiers } from '@/lib/session/spec-generator'
 import { makeDecision } from '../../fixtures'
 
 // ── escapeCell ────────────────────────────────────────────────────────────────

@@ -28,7 +28,9 @@ export function loadEnvVar(key: string): string | undefined {
       const eqIdx = trimmed.indexOf('=')
       if (trimmed.slice(0, eqIdx) === key) return trimmed.slice(eqIdx + 1)
     }
-  } catch { /* .env.local not found */ }
+  } catch {
+    /* .env.local not found */
+  }
   return process.env[key]
 }
 

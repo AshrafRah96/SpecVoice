@@ -73,6 +73,7 @@ The usual approach for "AI that understands a codebase" is: chunk the code, embe
 SpecVoice doesn't do this. The agent tools give Claude file access on demand — it calls `list_files` to orient, then `read_file` to read exactly what it needs, `search_code` to find usages. Claude 3.5/4 has enough context window and reasoning capability to navigate a codebase this way without pre-indexing.
 
 Benefits:
+
 - No indexing step, no vector DB to manage, no embedding costs
 - Agent reads what's actually relevant to the current question, not what a similarity search thinks is relevant
 - The audit trail (files read, decisions logged) is a first-class feature, not a side effect
@@ -84,6 +85,7 @@ Constraint: File reads are capped at 4000 characters. The agent must navigate de
 ## Why ElevenLabs tools are standalone entities
 
 The ElevenLabs API distinguishes between:
+
 - **Tools** — standalone API resources, created via `client.conversationalAi.tools.create()`
 - **Agent config** — references tools by their IDs in `prompt.toolIds`
 

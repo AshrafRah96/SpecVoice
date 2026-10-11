@@ -9,13 +9,13 @@ Post-call build pipeline triggered by `POST /api/sessions/[id]/build`. Returns 2
 
 ## File Map
 
-| File | Purpose |
-|---|---|
+| File                                       | Purpose                                                       |
+| ------------------------------------------ | ------------------------------------------------------------- |
 | `src/app/api/sessions/[id]/build/route.ts` | Route handler — guards, complexity gate, calls `executeBuild` |
-| `src/lib/build/executor.ts` | Main orchestration: prerequisites, clone, Claude Code CLI, PR |
-| `src/lib/build/clone.ts` | `cloneRepo(repoUrl)` → tmpdir, `cleanupTmpDir(dir)` |
-| `src/lib/build/github-pr.ts` | `createDraftPR(opts)` via Octokit |
-| `src/lib/build/index.ts` | Re-exports `executeBuild` |
+| `src/lib/build/executor.ts`                | Main orchestration: prerequisites, clone, Claude Code CLI, PR |
+| `src/lib/build/clone.ts`                   | `cloneRepo(repoUrl)` → tmpdir, `cleanupTmpDir(dir)`           |
+| `src/lib/build/github-pr.ts`               | `createDraftPR(opts)` via Octokit                             |
+| `src/lib/build/index.ts`                   | Re-exports `executeBuild`                                     |
 
 ## Route Handler Flow (`route.ts`)
 
@@ -31,12 +31,12 @@ Post-call build pipeline triggered by `POST /api/sessions/[id]/build`. Returns 2
 
 `lineEstimate = fileCount * 50`. Size thresholds:
 
-| size | lineEstimate | ~files |
-|---|---|---|
-| small | < 500 | < 10 |
-| medium | < 2000 | < 40 |
-| large | < 5000 | < 100 |
-| too_large | ≥ 5000 | ≥ 100 |
+| size      | lineEstimate | ~files |
+| --------- | ------------ | ------ |
+| small     | < 500        | < 10   |
+| medium    | < 2000       | < 40   |
+| large     | < 5000       | < 100  |
+| too_large | ≥ 5000       | ≥ 100  |
 
 Blocked when: `size === 'too_large'` OR `openQuestions.length > 0`.
 
@@ -86,11 +86,11 @@ Defined in `src/lib/session/types.ts`:
 interface ComplexityAssessment {
   fileCount: number
   openQuestionCount: number
-  lineEstimate: number          // fileCount * 50
+  lineEstimate: number // fileCount * 50
   size: 'small' | 'medium' | 'large' | 'too_large'
   blocked: boolean
   blockReason?: 'too_large' | 'open_questions'
-  splitSuggestion?: string[][]  // files grouped by top-level dir; only when too_large
+  splitSuggestion?: string[][] // files grouped by top-level dir; only when too_large
 }
 ```
 
@@ -104,13 +104,13 @@ interface ComplexityAssessment {
 
 ## Common Mistakes
 
-| # | Wrong | Correct |
-|---|-------|---------|
-| 1 | `setBuildStatus('error')` | `setBuildStatus('failed')` — `'error'` is not in BuildStatus |
-| 2 | `setBuildStatus('assessing')` | `'assessing'` is not in BuildStatus; remove it |
-| 3 | `buildStatus = 'idle'` after complexity block | `buildStatus = 'ready'` — spec is still present |
-| 4 | Parse `specOutput` markdown to count files | `fileCount = session.filesRead.length` |
-| 5 | `session.specOutput ?? generateSpec(session)` in orchestrator | No fallback — no spec means no build |
-| 6 | Treat local-path sessions (`repoLocalPath`) as buildable | They hit the `!session.repoUrl` fast-fail; only GitHub URL sessions can be built |
-| 7 | Calling Anthropic API directly during build | Use Claude Code CLI (`claude -p ... --output-format stream-json`) |
-| 8 | Cleaning tmpDir inside try block | Always clean in `finally` — even on failure |
+| #   | Wrong                                                         | Correct                                                                          |
+| --- | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 1   | `setBuildStatus('error')`                                     | `setBuildStatus('failed')` — `'error'` is not in BuildStatus                     |
+| 2   | `setBuildStatus('assessing')`                                 | `'assessing'` is not in BuildStatus; remove it                                   |
+| 3   | `buildStatus = 'idle'` after complexity block                 | `buildStatus = 'ready'` — spec is still present                                  |
+| 4   | Parse `specOutput` markdown to count files                    | `fileCount = session.filesRead.length`                                           |
+| 5   | `session.specOutput ?? generateSpec(session)` in orchestrator | No fallback — no spec means no build                                             |
+| 6   | Treat local-path sessions (`repoLocalPath`) as buildable      | They hit the `!session.repoUrl` fast-fail; only GitHub URL sessions can be built |
+| 7   | Calling Anthropic API directly during build                   | Use Claude Code CLI (`claude -p ... --output-format stream-json`)                |
+| 8   | Cleaning tmpDir inside try block                              | Always clean in `finally` — even on failure                                      |

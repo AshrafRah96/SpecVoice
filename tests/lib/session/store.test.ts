@@ -92,9 +92,7 @@ describe('SessionStore BuildStatus state machine', () => {
 
   it('guard also fires when buildStatus is set via updateSession directly', () => {
     const s = makeSession('idle')
-    expect(() => sessionStore.updateSession(s.id, { buildStatus: 'failed' })).toThrow(
-      /invalid buildstatus transition/i
-    )
+    expect(() => sessionStore.updateSession(s.id, { buildStatus: 'failed' })).toThrow(/invalid buildstatus transition/i)
   })
 })
 
@@ -121,7 +119,12 @@ describe('SessionStore domain mutation methods', () => {
 
   it('addDecision accumulates multiple decisions', () => {
     const session = sessionStore.createSession()
-    const base = { rationale: 'r', alternativesConsidered: [], relevantFiles: [], timestamp: new Date().toISOString() }
+    const base = {
+      rationale: 'r',
+      alternativesConsidered: [],
+      relevantFiles: [],
+      timestamp: new Date().toISOString(),
+    }
     sessionStore.addDecision(session.id, { id: 'a', summary: 'First', ...base })
     sessionStore.addDecision(session.id, { id: 'b', summary: 'Second', ...base })
     expect(sessionStore.getSession(session.id)!.decisions).toHaveLength(2)
@@ -130,7 +133,11 @@ describe('SessionStore domain mutation methods', () => {
   it('recordFileRead appends a FileRead and broadcasts session_updated', () => {
     const session = sessionStore.createSession()
     const events = captureEvents(session.id)
-    const fileRead = { path: 'src/lib/foo.ts', timestamp: new Date().toISOString(), characterCount: 420 }
+    const fileRead = {
+      path: 'src/lib/foo.ts',
+      timestamp: new Date().toISOString(),
+      characterCount: 420,
+    }
 
     sessionStore.recordFileRead(session.id, fileRead)
 
@@ -143,7 +150,12 @@ describe('SessionStore domain mutation methods', () => {
   it('flagQuestion appends an OpenQuestion and broadcasts session_updated', () => {
     const session = sessionStore.createSession()
     const events = captureEvents(session.id)
-    const question = { id: 'q-1', question: 'Migrate?', context: 'ctx', timestamp: new Date().toISOString() }
+    const question = {
+      id: 'q-1',
+      question: 'Migrate?',
+      context: 'ctx',
+      timestamp: new Date().toISOString(),
+    }
 
     sessionStore.flagQuestion(session.id, question)
 
@@ -178,7 +190,9 @@ describe('SessionStore build lifecycle mutations', () => {
     expect(updated.callDurationSecs).toBe(42)
     expect(updated.transcript).toBe('[{"role":"user","message":"hi"}]')
 
-    const callEnded = events.find(e => e.type === 'call_ended') as Extract<SessionEvent, { type: 'call_ended' }> | undefined
+    const callEnded = events.find(e => e.type === 'call_ended') as
+      | Extract<SessionEvent, { type: 'call_ended' }>
+      | undefined
     expect(callEnded).toBeDefined()
     expect(callEnded!.callDurationSecs).toBe(42)
   })
@@ -196,12 +210,18 @@ describe('SessionStore build lifecycle mutations', () => {
   it('blockBuild transitions to ready and emits build_blocked with assessment', () => {
     const session = sessionStore.createSession({ buildStatus: 'building' })
     const events = captureEvents(session.id)
-    const assessment: ComplexityAssessment = { ...stubAssessment, blocked: true, blockReason: 'too_large' }
+    const assessment: ComplexityAssessment = {
+      ...stubAssessment,
+      blocked: true,
+      blockReason: 'too_large',
+    }
 
     sessionStore.blockBuild(session.id, assessment)
 
     expect(sessionStore.getSession(session.id)!.buildStatus).toBe('ready')
-    const blocked = events.find(e => e.type === 'build_blocked') as Extract<SessionEvent, { type: 'build_blocked' }> | undefined
+    const blocked = events.find(e => e.type === 'build_blocked') as
+      | Extract<SessionEvent, { type: 'build_blocked' }>
+      | undefined
     expect(blocked).toBeDefined()
     expect(blocked!.assessment.blockReason).toBe('too_large')
   })
@@ -213,7 +233,9 @@ describe('SessionStore build lifecycle mutations', () => {
     sessionStore.failBuild(session.id, 'claude CLI not found')
 
     expect(sessionStore.getSession(session.id)!.buildStatus).toBe('failed')
-    const failed = events.find(e => e.type === 'build_failed') as Extract<SessionEvent, { type: 'build_failed' }> | undefined
+    const failed = events.find(e => e.type === 'build_failed') as
+      | Extract<SessionEvent, { type: 'build_failed' }>
+      | undefined
     expect(failed).toBeDefined()
     expect(failed!.error).toBe('claude CLI not found')
   })
@@ -226,7 +248,9 @@ describe('SessionStore build lifecycle mutations', () => {
     sessionStore.emitBuildProgress(session.id, 'analyzing', 'src/lib/foo.ts')
 
     expect(sessionStore.getSession(session.id)!.updatedAt).toBe(before)
-    const progress = events.find(e => e.type === 'build_progress') as Extract<SessionEvent, { type: 'build_progress' }> | undefined
+    const progress = events.find(e => e.type === 'build_progress') as
+      | Extract<SessionEvent, { type: 'build_progress' }>
+      | undefined
     expect(progress).toBeDefined()
     expect(progress!.phase).toBe('analyzing' as BuildPhase)
     expect(progress!.detail).toBe('src/lib/foo.ts')
@@ -241,7 +265,9 @@ describe('SessionStore build lifecycle mutations', () => {
     const updated = sessionStore.getSession(session.id)!
     expect(updated.buildStatus).toBe('complete')
     expect(updated.prUrl).toBe('https://github.com/owner/repo/pull/42')
-    const complete = events.find(e => e.type === 'build_complete') as Extract<SessionEvent, { type: 'build_complete' }> | undefined
+    const complete = events.find(e => e.type === 'build_complete') as
+      | Extract<SessionEvent, { type: 'build_complete' }>
+      | undefined
     expect(complete).toBeDefined()
     expect(complete!.prUrl).toBe('https://github.com/owner/repo/pull/42')
   })

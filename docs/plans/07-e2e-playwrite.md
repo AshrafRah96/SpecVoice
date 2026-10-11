@@ -1,5 +1,7 @@
 # E2E Test — UI + Critical Path (Playwright)
 
+> Historical implementation plan. The current configuration and test already exist in `playwright.config.ts` and `tests/e2e/critical-path.spec.ts`; use `npm run test:e2e` for the supported command.
+
 This test drives the real browser against the real dev server. The voice call itself can't be automated — WebRTC and ElevenLabs aren't scriptable in a headless browser — so the agent tool calls are fired as HTTP requests from within the test while the browser is open and watching. This is intentional: you're verifying that every SSE event correctly updates the UI, not that ElevenLabs works.
 
 ---
@@ -135,7 +137,7 @@ test('critical path — session creation to buildStatus ready', async ({ page, c
 
 ## data-testid attributes you need to add
 
-The test above references `data-testid` attributes that probably don't exist yet. Add them — they're one-liners in each component and don't affect styling.
+The test relies on the following stable `data-testid` attributes, which are already present in the current components:
 
 | Attribute | Where |
 |---|---|

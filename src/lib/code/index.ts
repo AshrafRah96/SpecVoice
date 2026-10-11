@@ -7,10 +7,7 @@ import { createHotReloadSafeSingleton } from '@/lib/singleton'
 
 export { InMemoryCodeSource }
 
-const codeSourceRegistry = createHotReloadSafeSingleton(
-  '__codeSourceRegistry',
-  () => new Map<string, CodeSource>()
-)
+const codeSourceRegistry = createHotReloadSafeSingleton('__codeSourceRegistry', () => new Map<string, CodeSource>())
 
 export function registerCodeSource(sessionId: string, source: CodeSource): () => void {
   codeSourceRegistry.set(sessionId, source)

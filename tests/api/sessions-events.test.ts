@@ -21,7 +21,9 @@ function parseEvent(raw: string): unknown {
 describe('GET /api/sessions/[id]/events', () => {
   it('returns 404 for unknown session', async () => {
     const controller = new AbortController()
-    const res = await GET(makeRequest('no-such', controller.signal), { params: Promise.resolve({ id: 'no-such' }) })
+    const res = await GET(makeRequest('no-such', controller.signal), {
+      params: Promise.resolve({ id: 'no-such' }),
+    })
     controller.abort()
     expect(res.status).toBe(404)
   })
@@ -29,7 +31,9 @@ describe('GET /api/sessions/[id]/events', () => {
   it('sends initial session snapshot immediately as session_updated', async () => {
     const session = sessionStore.createSession()
     const controller = new AbortController()
-    const res = await GET(makeRequest(session.id, controller.signal), { params: Promise.resolve({ id: session.id }) })
+    const res = await GET(makeRequest(session.id, controller.signal), {
+      params: Promise.resolve({ id: session.id }),
+    })
 
     expect(res.headers.get('Content-Type')).toContain('text/event-stream')
 
@@ -46,7 +50,9 @@ describe('GET /api/sessions/[id]/events', () => {
   it('forwards broadcasted events to the stream after the initial snapshot', async () => {
     const session = sessionStore.createSession()
     const controller = new AbortController()
-    const res = await GET(makeRequest(session.id, controller.signal), { params: Promise.resolve({ id: session.id }) })
+    const res = await GET(makeRequest(session.id, controller.signal), {
+      params: Promise.resolve({ id: session.id }),
+    })
 
     const reader = res.body!.getReader()
     // Consume initial snapshot
@@ -65,7 +71,9 @@ describe('GET /api/sessions/[id]/events', () => {
   it('closes the stream and unsubscribes when the request is aborted', async () => {
     const session = sessionStore.createSession()
     const controller = new AbortController()
-    const res = await GET(makeRequest(session.id, controller.signal), { params: Promise.resolve({ id: session.id }) })
+    const res = await GET(makeRequest(session.id, controller.signal), {
+      params: Promise.resolve({ id: session.id }),
+    })
 
     const reader = res.body!.getReader()
     // Consume initial snapshot so the reader is past the first write

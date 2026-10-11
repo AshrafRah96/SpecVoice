@@ -1,0 +1,22 @@
+# Issue tracker: GitHub
+
+Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+
+## Conventions
+
+- **Create an issue**: `gh issue create --title "..." --body "..."`.
+- **Read an issue**: `gh issue view <number> --json number,title,body,labels,comments`.
+- **List issues**: `gh issue list --state open --json number,title,body,labels,comments`.
+- **Comment on an issue**: `gh issue comment <number> --body "..."`.
+- **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`.
+- **Close**: `gh issue close <number> --comment "..."`.
+
+Infer the repository from the GitHub remote; `gh` does this automatically inside the clone.
+
+## Pull requests as a triage surface
+
+**PRs as a request surface: no.**
+
+When a skill says “publish to the issue tracker,” create a GitHub issue. When it says “fetch the relevant ticket,” use `gh issue view`.
+
+For larger work, use GitHub sub-issues or add `Part of #<parent>` when sub-issues are unavailable. Record blockers as GitHub issue dependencies where supported.

@@ -1,5 +1,7 @@
 # Feature Doc Corrections
 
+> Historical correction log. Use current source, tests, and `docs/architecture.md` for present behavior.
+
 Apply all of these before running any feature through Claude Code. Some are spec inconsistencies caught during review, two are over-engineering cuts, and the last six came out of auditing the execution plan for Feature 02 directly.
 
 ---

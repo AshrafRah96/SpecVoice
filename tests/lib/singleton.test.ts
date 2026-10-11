@@ -18,8 +18,14 @@ describe('createHotReloadSafeSingleton', () => {
 
   it('returns the same instance on repeated calls (factory called once)', () => {
     let calls = 0
-    const first = createHotReloadSafeSingleton(TEST_KEY, () => { calls++; return {} })
-    const second = createHotReloadSafeSingleton(TEST_KEY, () => { calls++; return {} })
+    const first = createHotReloadSafeSingleton(TEST_KEY, () => {
+      calls++
+      return {}
+    })
+    const second = createHotReloadSafeSingleton(TEST_KEY, () => {
+      calls++
+      return {}
+    })
     expect(first).toBe(second)
     expect(calls).toBe(1)
   })

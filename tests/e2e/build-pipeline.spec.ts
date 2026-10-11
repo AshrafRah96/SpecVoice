@@ -15,7 +15,10 @@ const fixturePath = path.resolve('./tests/fixtures/sample-repo')
  */
 async function createLocalSession(page: Page): Promise<string> {
   await page.route('**/api/sessions', async route => {
-    if (route.request().method() !== 'POST') { await route.continue(); return }
+    if (route.request().method() !== 'POST') {
+      await route.continue()
+      return
+    }
     await route.continue({ postData: JSON.stringify({ repoLocalPath: fixturePath }) })
   })
 
@@ -28,7 +31,9 @@ async function createLocalSession(page: Page): Promise<string> {
   const sessionId = await sessionIdLocator.textContent()
   expect(sessionId).toBeTruthy()
 
-  await expect(page.locator('[data-testid="sse-status"]')).toHaveText('connected', { timeout: 5000 })
+  await expect(page.locator('[data-testid="sse-status"]')).toHaveText('connected', {
+    timeout: 5000,
+  })
 
   return sessionId!
 }
@@ -37,11 +42,7 @@ async function createLocalSession(page: Page): Promise<string> {
  * Drive the session through: save-decision → generate-spec → post-call webhook.
  * After this the "Build It" button should be visible.
  */
-async function driveSessionToReady(
-  request: APIRequestContext,
-  sessionId: string,
-  webhookSecret: string | undefined
-) {
+async function driveSessionToReady(request: APIRequestContext, sessionId: string, webhookSecret: string | undefined) {
   await request.post('/api/tools/save-decision', {
     data: {
       session_id: sessionId,

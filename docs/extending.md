@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
 ```
 
 **Rules:**
+
 - Use `@/` path alias for all imports — never relative paths from `src/lib/` to `src/app/`
 - Validate with Zod. Trust nothing from the incoming webhook body
 - If the tool mutates session state, use `sessionStore.updateSession()` — it broadcasts `session_updated` automatically
@@ -88,7 +89,7 @@ export function buildYourToolDefinition(appUrl: string): ToolRequestModel {
   return {
     toolConfig: {
       type: 'webhook',
-      name: 'your_tool_name',          // snake_case, matches what the agent calls
+      name: 'your_tool_name', // snake_case, matches what the agent calls
       description: 'One sentence. What does this tool do and when should the agent use it?',
       apiSchema: {
         url: `${appUrl}/api/tools/your-tool-name`,

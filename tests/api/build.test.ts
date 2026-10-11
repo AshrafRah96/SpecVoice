@@ -10,14 +10,16 @@ function makeRequest(id: string): NextRequest {
 
 describe('POST /api/sessions/[id]/build', () => {
   it('returns 404 for unknown session', async () => {
-    const res = await POST(makeRequest('no-such-session'), { params: { id: 'no-such-session' } })
+    const res = await POST(makeRequest('no-such-session'), {
+      params: Promise.resolve({ id: 'no-such-session' }),
+    })
     expect(res.status).toBe(404)
   })
 
   it('returns 400 when session has no specOutput', async () => {
     const session = sessionStore.createSession()
     // specOutput is undefined by default — build must be refused
-    const res = await POST(makeRequest(session.id), { params: { id: session.id } })
+    const res = await POST(makeRequest(session.id), { params: Promise.resolve({ id: session.id }) })
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'No spec to build from.' })
   })
@@ -25,14 +27,20 @@ describe('POST /api/sessions/[id]/build', () => {
   it('returns 409 when build already in progress', async () => {
     // Create directly in 'building' state to bypass the state machine guard —
     // we're testing the HTTP-level idempotency check, not a valid transition.
-    const session = sessionStore.createSession({ specOutput: '# Spec\n- step 1', buildStatus: 'building' })
-    const res = await POST(makeRequest(session.id), { params: { id: session.id } })
+    const session = sessionStore.createSession({
+      specOutput: '# Spec\n- step 1',
+      buildStatus: 'building',
+    })
+    const res = await POST(makeRequest(session.id), { params: Promise.resolve({ id: session.id }) })
     expect(res.status).toBe(409)
   })
 
   it('returns 202 and accepts build when session has a spec', async () => {
-    const session = sessionStore.createSession({ specOutput: '# Spec\n- step 1', buildStatus: 'ready' })
-    const res = await POST(makeRequest(session.id), { params: { id: session.id } })
+    const session = sessionStore.createSession({
+      specOutput: '# Spec\n- step 1',
+      buildStatus: 'ready',
+    })
+    const res = await POST(makeRequest(session.id), { params: Promise.resolve({ id: session.id }) })
     expect(res.status).toBe(202)
     expect(await res.json()).toEqual({ accepted: true })
   })
@@ -41,16 +49,14 @@ describe('POST /api/sessions/[id]/build', () => {
     const session = sessionStore.createSession({
       specOutput: '# Spec content',
       buildStatus: 'ready',
-      openQuestions: [
-        { id: 'q1', question: 'Migrate?', context: 'context', timestamp: new Date().toISOString() },
-      ],
+      openQuestions: [{ id: 'q1', question: 'Migrate?', context: 'context', timestamp: new Date().toISOString() }],
     })
 
     // Collect all events fired synchronously during the POST call
     const events: SessionEvent[] = []
     const unsub = sessionStore.subscribe(session.id, e => events.push(e))
 
-    const res = await POST(makeRequest(session.id), { params: { id: session.id } })
+    const res = await POST(makeRequest(session.id), { params: Promise.resolve({ id: session.id }) })
     unsub()
 
     expect(res.status).toBe(202)
