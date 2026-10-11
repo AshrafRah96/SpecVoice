@@ -6,12 +6,12 @@
 - Unclassified: 7 file(s) not represented in the graph (top: (none) 6, .css 1)
 
 ## Summary
-- 673 nodes · 1186 edges · 54 communities (42 shown, 12 thin omitted)
+- 673 nodes · 1184 edges · 47 communities (37 shown, 10 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 42 edges (avg confidence: 0.95)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ad730ab6`
+- Built from commit: `f7b8314b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -20,15 +20,15 @@
 - local-source.ts
 - tool-handler.ts
 - package.json
-- post-call/route.ts
+- env.ts
 - store.ts
-- spec-generator.ts
+- dependencies
 - sessionStore
 - compilerOptions
 - ref_path
 - devDependencies
 - components.json
-- scripts
+- Claude Code integration
 - DX Audit
 - sample-repo/package.json
 - src/index.ts
@@ -39,24 +39,18 @@
 - docs/README.md
 - Graphify workflow
 - Tutorial: Your First SpecVoice Session
-- vitest
 - specvoice-feature-02-build-system/SKILL.md
 - ElevenLabs SDK — Undocumented Behavior & Workarounds
 - Manual HTTP/SSE Smoke Test
 - API Reference
-- Tool Webhooks
-- Build Pipeline
-- specvoice-feature-01-agent-enrichment/SKILL.md
 - Adding a new agent tool
 - Setup Guide
-- complexity.ts
 - Agent contract
 - specvoice-feature-e2e/SKILL.md
 - SSE Events
 - Agent skills
 - system-prompt.md
 - Security policy
-- singleton.ts
 - Documentation map
 - SpecVoice
 - Contributing
@@ -65,7 +59,6 @@
 - Canonical agent contract and least-privilege execution
 - Keep Claude Code execution post-call
 - Bound session capabilities and require an explicit in-memory deployment mode
-- elevenlabs-tools.md
 - triage-labels.md
 - sample-repo/README.md
 
@@ -82,21 +75,21 @@
 10. `requireSessionCapability()` - 12 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Step 3 — Exercise the tool webhooks` --references--> `SpecPreview()`  [INFERRED]
-  docs/testing/manual-smoke.md → src/components/SpecPreview.tsx
-- `The core data flow` --references--> `sessionStore`  [INFERRED]
-  docs/architecture.md → src/lib/session/store.ts
 - ``POST /api/tools/read-file`` --references--> `FileRead`  [INFERRED]
+  docs/api-reference.md → src/lib/session/types.ts
+- ``build_progress`` --references--> `BuildPhase`  [INFERRED]
   docs/api-reference.md → src/lib/session/types.ts
 - `Types` --references--> `BuildStatus`  [INFERRED]
   docs/api-reference.md → src/lib/session/types.ts
-- `Common mistakes` --references--> `BuildStatus`  [INFERRED]
-  docs/build-pipeline.md → src/lib/session/types.ts
+- `The core data flow` --references--> `sessionStore`  [INFERRED]
+  docs/architecture.md → src/lib/session/store.ts
+- `How session capabilities travel from browser to tool webhook` --references--> `Session`  [INFERRED]
+  docs/architecture.md → src/lib/session/types.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (54 total, 12 thin omitted)
+## Communities (47 total, 10 thin omitted)
 
 ### Community 0 - "SessionControls.tsx"
 Cohesion: 0.07
@@ -107,28 +100,28 @@ Cohesion: 0.08
 Nodes (31): Architecture, Build pipeline placement, Code source abstraction, How session capabilities travel from browser to tool webhook, The core data flow, Why ElevenLabs tools are standalone entities, Why `globalThis` for singletons, Why no RAG, no embeddings, no vector database (+23 more)
 
 ### Community 2 - "tool-handler.ts"
-Cohesion: 0.08
-Nodes (37): Step 1: Create the route, next, GET(), GET(), GET(), POST(), schema, errorResponse() (+29 more)
+Cohesion: 0.07
+Nodes (40): Step 1: Create the route, next, POST(), PostCallPayloadSchema, TranscriptTurnSchema, GET(), GET(), GET() (+32 more)
 
 ### Community 3 - "package.json"
 Cohesion: 0.05
-Nodes (36): dependencies, class-variance-authority, clsx, @elevenlabs/elevenlabs-js, @elevenlabs/react, geist, ignore, next (+28 more)
+Nodes (36): engines, node, typescript, zod, name, private, scripts, build (+28 more)
 
-### Community 4 - "post-call/route.ts"
-Cohesion: 0.07
-Nodes (23): Agent Configuration, Common Mistakes, Core Rule, Enum Quick Reference, Imports, Post-Call Webhook, Standalone Tool Definitions, useConversation Hook (React) (+15 more)
+### Community 4 - "env.ts"
+Cohesion: 0.09
+Nodes (20): Agent Configuration, Common Mistakes, Core Rule, Enum Quick Reference, Imports, Post-Call Webhook, Standalone Tool Definitions, useConversation Hook (React) (+12 more)
 
 ### Community 5 - "store.ts"
-Cohesion: 0.18
-Nodes (10): useSession Hook, guardBuildTransition(), VALID_TRANSITIONS, BuildStatus, ComplexityAssessment, OpenQuestion, SessionEvent, SessionStatus (+2 more)
+Cohesion: 0.06
+Nodes (41): useSession Hook, Branch naming, Build Pipeline, Claude Code invocation, Common mistakes, Complexity gate, `ComplexityAssessment` shape, Gate logic (+33 more)
 
-### Community 6 - "spec-generator.ts"
-Cohesion: 0.40
-Nodes (7): categorizeDecision(), classifiers, DecisionClassifier, decisionsTable(), escapeCell(), generateSpec(), Decision
+### Community 6 - "dependencies"
+Cohesion: 0.14
+Nodes (14): dependencies, class-variance-authority, clsx, @elevenlabs/elevenlabs-js, @elevenlabs/react, geist, ignore, next (+6 more)
 
 ### Community 7 - "sessionStore"
-Cohesion: 0.16
-Nodes (11): SSE Events, Build boundary, Claude Code integration, Runtime invariants, Source of truth, `POST /api/agent/post-call`, Post-Call Webhook, Dashboard breaks silently when a mutation doesn't broadcast (+3 more)
+Cohesion: 0.14
+Nodes (13): Common Mistakes, Key Files, Overview, Post-Call Webhook, Session Types, Voice Settings, SSE Events, `POST /api/agent/post-call` (+5 more)
 
 ### Community 8 - "compilerOptions"
 Cohesion: 0.11
@@ -146,9 +139,9 @@ Nodes (15): devDependencies, autoprefixer, eslint, eslint-config-next, @playwrig
 Cohesion: 0.14
 Nodes (13): aliases, components, utils, rsc, $schema, style, tailwind, baseColor (+5 more)
 
-### Community 12 - "scripts"
-Cohesion: 0.14
-Nodes (14): scripts, build, dev, format, format:check, lint, start, test (+6 more)
+### Community 12 - "Claude Code integration"
+Cohesion: 0.40
+Nodes (4): Build boundary, Claude Code integration, Runtime invariants, Source of truth
 
 ### Community 13 - "DX Audit"
 Cohesion: 0.15
@@ -178,10 +171,6 @@ Nodes (7): Completion, Evidence rules, Graphify workflow, Outputs, Setup, When t
 Cohesion: 0.18
 Nodes (11): Before you start, Setting up ngrok, Step 1: Create a session, Step 2: Start the call, Step 3: Have the conversation, Step 4: End the call, Step 5: Review the spec, Step 6: Trigger the build (+3 more)
 
-### Community 25 - "vitest"
-Cohesion: 0.33
-Nodes (4): @vitejs/plugin-react, vitest, makeDecision(), makeSession()
-
 ### Community 26 - "specvoice-feature-02-build-system/SKILL.md"
 Cohesion: 0.20
 Nodes (9): Branch Name, `BuildPipeline` Orchestration, Claude Code Invocation, Common Mistakes, Complexity Gate, ComplexityAssessment Shape, File Map, Overview (+1 more)
@@ -191,24 +180,12 @@ Cohesion: 0.20
 Nodes (10): 1. `checkAnyToolMatches: true` expects zero tool calls without `toolCallParameters`, 2. Unit tests require `dynamicVariables` even when they don't call tools, 3. `type: 'llm'` tests evaluate the full agent turn, tool calls included, 4. Array items in `requestBodySchema` require a value-source field, 5. The agent ignores explicit guardrails when chat history shows no prior exploration, 6. `simulateConversation` requires `dynamicVariables` for all agent tool dynamic variables, 7. camelCase vs snake_case is never documented together, 8. Agent config types are only discoverable by reading generated source files (+2 more)
 
 ### Community 28 - "Manual HTTP/SSE Smoke Test"
-Cohesion: 0.20
-Nodes (10): Manual HTTP/SSE Smoke Test, Step 1 — Create a session, Step 2 — Open the SSE stream, Step 3 — Exercise the tool webhooks, Step 4 — Verify session state, Step 5 — Fire the post-call webhook, Step 6 — Verify missing session_id handling, Step 7 — Trigger the build (+2 more)
+Cohesion: 0.11
+Nodes (17): `POST /api/tools/flag-question`, `POST /api/tools/generate-spec`, `POST /api/tools/list-files`, `POST /api/tools/read-file`, `POST /api/tools/save-decision`, `POST /api/tools/search-code`, Tool Webhooks, Manual HTTP/SSE Smoke Test (+9 more)
 
 ### Community 29 - "API Reference"
 Cohesion: 0.29
 Nodes (7): API Reference, `GET /api/sessions/:id`, `GET /api/sessions/:id/events`, `POST /api/sessions`, `POST /api/sessions/:id/build`, Sessions, Types
-
-### Community 30 - "Tool Webhooks"
-Cohesion: 0.29
-Nodes (7): `POST /api/tools/flag-question`, `POST /api/tools/generate-spec`, `POST /api/tools/list-files`, `POST /api/tools/read-file`, `POST /api/tools/save-decision`, `POST /api/tools/search-code`, Tool Webhooks
-
-### Community 31 - "Build Pipeline"
-Cohesion: 0.15
-Nodes (13): Branch naming, Build Pipeline, Claude Code invocation, Common mistakes, Complexity gate, `ComplexityAssessment` shape, Gate logic, Implementation (+5 more)
-
-### Community 32 - "specvoice-feature-01-agent-enrichment/SKILL.md"
-Cohesion: 0.29
-Nodes (6): Common Mistakes, Key Files, Overview, Post-Call Webhook, Session Types, Voice Settings
 
 ### Community 33 - "Adding a new agent tool"
 Cohesion: 0.22
@@ -217,10 +194,6 @@ Nodes (9): Adding a new agent tool, Adding a new SSE event type, Extending SpecV
 ### Community 34 - "Setup Guide"
 Cohesion: 0.22
 Nodes (9): 1. Prerequisites, 2. Install dependencies, 3. Configure environment variables, 4. Start your tunnel, 5. Start the dev server, 6. Create the ElevenLabs agent, 7. Configure the post-call webhook in ElevenLabs, 8. Verify the setup (+1 more)
-
-### Community 35 - "complexity.ts"
-Cohesion: 0.32
-Nodes (6): assessComplexity(), charCountEstimator(), groupByTopLevelDir(), SIZE_THRESHOLDS, SizeEstimator, sizeFromLineEstimate()
 
 ### Community 36 - "Agent contract"
 Cohesion: 0.25
@@ -267,18 +240,18 @@ Cohesion: 0.50
 Nodes (4): Architecture, Commands, SpecVoice, Troubleshooting
 
 ## Knowledge Gaps
-- **295 isolated node(s):** `singleQuote`, `semi`, `arrowParens`, `trailingComma`, `printWidth` (+290 more)
+- **295 isolated node(s):** `Overview`, `Key Files`, `Voice Settings`, `Post-Call Webhook`, `Session Types` (+290 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 336 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **12 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `sessionStore` connect `sessionStore` to `local-source.ts`, `tool-handler.ts`, `post-call/route.ts`, `store.ts`, `DX Audit`?**
+- **Why does `sessionStore` connect `sessionStore` to `local-source.ts`, `tool-handler.ts`, `store.ts`, `Claude Code integration`, `DX Audit`?**
   _High betweenness centrality (0.144) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `sessionStore` (e.g. with `SSE Events` and `Runtime invariants`) actually correct?**
   _`sessionStore` has 5 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `singleQuote`, `semi`, `arrowParens` to the rest of the system?**
+- **What connects `Overview`, `Key Files`, `Voice Settings` to the rest of the system?**
   _295 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `SessionControls.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.06838106370543542 - nodes in this community are weakly interconnected._
