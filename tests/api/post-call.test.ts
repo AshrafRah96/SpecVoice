@@ -67,4 +67,15 @@ describe('POST /api/agent/post-call', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ignored: 'unknown session' })
   })
+
+  it('deduplicates the same signed delivery payload in memory mode', async () => {
+    const session = sessionStore.createSession()
+    const body = validPayload(session.id)
+    const first = await POST(makeRequest(body))
+    const second = await POST(makeRequest(body))
+
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+    expect(await second.json()).toEqual({ received: true, duplicate: true })
+  })
 })

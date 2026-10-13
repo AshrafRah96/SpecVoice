@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { spawnSync } from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -14,17 +15,29 @@ function slugify(text: string): string {
 }
 
 export function buildBranchName(session: Session): string {
-  const slug = session.decisions[0]?.summary
-    ? slugify(session.decisions[0].summary)
-    : session.id.slice(0, 8)
-  return `spec-voice/${slug}`
+  const slug = session.decisions[0]?.summary ? slugify(session.decisions[0].summary) : session.id.slice(0, 8)
+  const attempt = createHash('sha256')
+    .update(session.buildAttemptKey ?? session.id)
+    .digest('hex')
+    .slice(0, 16)
+  return `spec-voice/${slug || 'build'}-${session.id}-${attempt}`
 }
 
 export function writeBuildFiles(dir: string, session: Session): void {
-  // Exclude build input files from the repo commit — append to .gitignore (or create it).
-  const gitignorePath = path.join(dir, '.gitignore')
-  const gitignoreEntry = '\n# SpecVoice build inputs\nSPEC.md\nCONTEXT.md\n'
-  fs.appendFileSync(gitignorePath, gitignoreEntry)
+  // Build inputs belong to this checkout, never to the proposed repository change.
+  for (const name of ['SPEC.md', 'CONTEXT.md']) {
+    const tracked = spawnSync('git', ['-C', dir, 'ls-files', '--error-unmatch', '--', name], {
+      stdio: 'pipe',
+      timeout: 10_000,
+    })
+    if (tracked.error || (tracked.status !== 0 && tracked.status !== 1))
+      throw new Error(`Cannot inspect build input collision: ${name}`, { cause: tracked.error })
+    const existing = fs.lstatSync(path.join(/* turbopackIgnore: true */ dir, name), { throwIfNoEntry: false })
+    if (tracked.status === 0 || existing) throw new Error(`Build input collides with repository file: ${name}`)
+  }
+  const info = path.join(dir, '.git', 'info')
+  fs.mkdirSync(info, { recursive: true })
+  fs.appendFileSync(path.join(info, 'exclude'), '\n/SPEC.md\n/CONTEXT.md\n')
 
   // SPEC.md — raw spec output
   fs.writeFileSync(path.join(dir, 'SPEC.md'), session.specOutput!)
@@ -33,7 +46,7 @@ export function writeBuildFiles(dir: string, session: Session): void {
   const decisionSection =
     session.decisions.length > 0
       ? session.decisions
-          .map((d) =>
+          .map(d =>
             [
               `### ${d.summary}`,
               `**Rationale:** ${d.rationale}`,
@@ -48,7 +61,7 @@ export function writeBuildFiles(dir: string, session: Session): void {
   if (session.transcript) {
     try {
       const turns = JSON.parse(session.transcript) as Array<{ role: string; message: string }>
-      transcriptSection = turns.map((t) => `**${t.role}:** ${t.message}`).join('\n\n')
+      transcriptSection = turns.map(t => `**${t.role}:** ${t.message}`).join('\n\n')
     } catch {
       transcriptSection = session.transcript
     }
@@ -75,30 +88,22 @@ export function writeBuildFiles(dir: string, session: Session): void {
 // ── Prerequisites ─────────────────────────────────────────────────────────────
 
 export function checkPrerequisites(): { ok: boolean; error?: string } {
-  const result = spawnSync('claude', ['--version'], { stdio: 'pipe', encoding: 'utf8' })
-  if (result.status !== 0 || result.error) {
+  if (
+    !process.env.DATABASE_URL ||
+    !process.env.SPECVOICE_SERVICE_SECRET ||
+    process.env.SPECVOICE_SERVICE_SECRET.length < 32
+  ) {
     return {
       ok: false,
       error:
-        'claude CLI not found. Install it: npm install -g @anthropic-ai/claude-code and re-run.',
-    }
-  }
-  // Access process.env directly — these are optional in the env schema so the
-  // validated `env` object is not needed here. Importing `env` at module level
-  // would throw in test environments missing ELEVENLABS_API_KEY.
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return {
-      ok: false,
-      error: 'ANTHROPIC_API_KEY is not set. Add it to .env.local and restart the server.',
+        'Builds require PostgreSQL and isolated Docker execution. Configure SPECVOICE_SERVICE_SECRET and start the local Compose stack.',
     }
   }
   if (!process.env.GITHUB_TOKEN) {
     return {
       ok: false,
-      error:
-        'GITHUB_TOKEN is not set. Add it to .env.local — required to push the branch and create the PR.',
+      error: 'GITHUB_TOKEN is not set. Add it to .env.local — required to push the branch and create the PR.',
     }
   }
   return { ok: true }
 }
-

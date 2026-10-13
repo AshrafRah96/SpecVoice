@@ -1,6 +1,4 @@
 import { createHmac } from 'crypto'
-import * as fs from 'fs'
-import * as path from 'path'
 
 /**
  * Compute an ElevenLabs webhook signature header value.
@@ -14,25 +12,7 @@ export function signWebhookPayload(rawBody: string, secret: string): string {
   return `t=${timestamp},${sig}`
 }
 
-/**
- * Read an env var from .env.local first, falling back to process.env.
- * Lets E2E tests sign webhook requests using the same secret the running
- * server is configured with, without baking the value into the test file.
- */
-export function loadEnvVar(key: string): string | undefined {
-  try {
-    const envFile = fs.readFileSync(path.resolve('.env.local'), 'utf8')
-    for (const line of envFile.split('\n')) {
-      const trimmed = line.trim()
-      if (trimmed.startsWith('#') || !trimmed.includes('=')) continue
-      const eqIdx = trimmed.indexOf('=')
-      if (trimmed.slice(0, eqIdx) === key) return trimmed.slice(eqIdx + 1)
-    }
-  } catch {
-    /* .env.local not found */
-  }
-  return process.env[key]
-}
+export const TEST_WEBHOOK_SECRET = 'specvoice-e2e-webhook-secret'
 
 /**
  * Build the fetch options needed to send a signed post-call webhook.
@@ -61,4 +41,13 @@ export function buildSignedPostCallRequest(
   }
 
   return { headers, data: rawBody }
+}
+
+export { TEST_OPERATOR_PASSPHRASE } from '../helpers/operator-fixture'
+
+export function testCapability(sessionId: string): string {
+  const payload = Buffer.from(JSON.stringify({ sid: sessionId, iat: Date.now(), exp: Date.now() + 3600000 })).toString(
+    'base64url'
+  )
+  return `${payload}.${createHmac('sha256', 'specvoice-e2e-capability-secret-fixed').update(payload).digest('base64url')}`
 }

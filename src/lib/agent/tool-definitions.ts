@@ -16,7 +16,7 @@ const SESSION_ID_PROP = {
 const SESSION_TOKEN_PROP = {
   type: LiteralJsonSchemaPropertyType.String,
   dynamicVariable: 'session_token',
-  description: 'Short-lived capability issued when the session is created.',
+  description: 'Call-bound capability issued when the private voice call starts.',
 } as const
 
 // Builds the webhook tool configs for use with conversationalAi.tools.create().

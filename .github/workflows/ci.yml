@@ -21,6 +21,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify
+      - run: npm run eval:offline
+      - name: Preserve versioned offline results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-evaluations
+          path: artifacts/evals/
+          if-no-files-found: ignore
+          retention-days: 90
 
   e2e:
     name: Playwright E2E
@@ -33,5 +42,75 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - name: Cache pinned Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+      - run: npm run test:e2e:install -- --with-deps
+      - run: npm run test:e2e -- --reporter=line,html
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+      - name: Preserve Playwright failure evidence
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failure-evidence
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  integration:
+    name: PostgreSQL integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: specvoice_ci_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d specvoice_ci_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/specvoice_ci_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:integration
+
+  deployment:
+    name: Local deployment and isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:compose
+      - run: npm run test:isolation
+      - run: docker build --target backup -t specvoice-backup:test .
+      - run: npm run test:backups
+      - run: npm run bench:repositories
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deployment-evidence
+          path: artifacts/
+          if-no-files-found: ignore
+          retention-days: 30

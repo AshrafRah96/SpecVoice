@@ -53,3 +53,12 @@ graphify-out/memory/
 graphify-out/reflections/
 graphify-out/obsidian/
 graphify-out/*/
+
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+.next-e2e/
+artifacts/

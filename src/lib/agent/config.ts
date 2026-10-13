@@ -42,6 +42,7 @@ export function buildAgentConfig(appUrl: string, toolIds: string[]) {
         speed: 0.95,
       },
       conversation: {
+        maxDurationSeconds: 2700,
         // Enable live transcript events so the dashboard can display the conversation in real time.
         clientEvents: [ClientEvent.Audio, ClientEvent.AgentResponse, ClientEvent.UserTranscript],
       },
@@ -59,6 +60,7 @@ export function buildAgentConfig(appUrl: string, toolIds: string[]) {
       },
     },
     platformSettings: {
+      auth: { enableAuth: true },
       // ElevenLabs analytics: post-call scores feed prompt iteration dashboard.
       evaluation: {
         criteria: [

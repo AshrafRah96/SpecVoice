@@ -3,7 +3,7 @@ node_modules/
 .next/
 coverage/
 dist/
-build/
+/build/
 out/
 test-results/
 playwright-report/
@@ -13,3 +13,6 @@ graphify-out/
 .env*
 .aws/
 .ssh/
+
+.next-e2e/
+artifacts/

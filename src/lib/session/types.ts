@@ -22,6 +22,52 @@ export interface FileRead {
 
 export type SessionStatus = 'active' | 'complete' | 'error'
 
+export type RepositoryTier = 'small' | 'mid' | 'large' | 'very-large'
+
+export type RepositoryIndexStatus = 'pending' | 'indexing' | 'ready' | 'partial' | 'failed' | 'expired'
+
+export interface RepositoryProfile {
+  repositorySha: string
+  fileCount: number
+  byteCount: number
+  languages: Record<string, number>
+  packages: Array<{ path: string; manifest: string; fileCount: number }>
+  generatedRoots: string[]
+  vendorRoots: string[]
+  treeComplete: boolean
+  indexStatus: Exclude<RepositoryIndexStatus, 'pending' | 'indexing' | 'expired'>
+  tier: RepositoryTier
+  error?: string
+  profiledAt: string
+}
+
+export interface ScopePlan {
+  id: string
+  repositorySha: string
+  includedRoots: string[]
+  excludedRoots: string[]
+  estimatedFiles: number
+  estimatedBytes: number
+  dependencyBoundaries: string[]
+  reason: string
+  status: 'proposed' | 'confirmed' | 'rejected'
+  createdAt: string
+  confirmedAt?: string
+}
+
+export interface RepositorySnapshot {
+  profileLease?: string
+  id: string
+  sessionId: string
+  source: { repoUrl?: string; repoLocalPath?: string }
+  repositorySha: string | null
+  indexStatus: RepositoryIndexStatus
+  profile: RepositoryProfile | null
+  scopePlan: ScopePlan | null
+  createdAt: string
+  updatedAt: string
+}
+
 export type BuildStatus = 'idle' | 'ready' | 'building' | 'complete' | 'failed'
 
 export type BuildPhase = 'analyzing' | 'writing' | 'reviewing' | 'cloning' | 'pr'
@@ -38,8 +84,14 @@ export interface ComplexityAssessment {
 
 export interface Session {
   id: string
+  currentCallId?: string | null
+  callState?: 'active' | 'awaiting_transcript' | 'complete' | 'failed'
+  callExpiresAt?: string
   repoUrl?: string
   repoLocalPath?: string
+  /** Immutable repository revision selected when the session starts. */
+  repositorySha?: string | null
+  scopePlan?: ScopePlan | null
   decisions: Decision[]
   openQuestions: OpenQuestion[]
   filesRead: FileRead[]
@@ -47,8 +99,11 @@ export interface Session {
   status: SessionStatus
   callDurationSecs: number | null
   transcript: string | null
+  /** Immutable server-owned origin, carried by events and frozen Build inputs. */
+  transcriptRecordedAt?: string
   buildStatus: BuildStatus
   buildAttemptKey?: string | null
+  buildRecovery?: { attemptId: string; error: string; retryable: boolean } | null
   prUrl: string | null
   complexityAssessment: ComplexityAssessment | null
   createdAt: string

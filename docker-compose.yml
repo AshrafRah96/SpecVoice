@@ -1,0 +1,203 @@
+x-profile-environment: &profile-environment
+  SPECVOICE_PROFILE_SMALL_MAX_FILES: ${SPECVOICE_PROFILE_SMALL_MAX_FILES:-5000}
+  SPECVOICE_PROFILE_SMALL_MAX_BYTES: ${SPECVOICE_PROFILE_SMALL_MAX_BYTES:-50000000}
+  SPECVOICE_PROFILE_MID_MAX_FILES: ${SPECVOICE_PROFILE_MID_MAX_FILES:-25000}
+  SPECVOICE_PROFILE_MID_MAX_BYTES: ${SPECVOICE_PROFILE_MID_MAX_BYTES:-250000000}
+  SPECVOICE_PROFILE_LARGE_MAX_FILES: ${SPECVOICE_PROFILE_LARGE_MAX_FILES:-100000}
+  SPECVOICE_PROFILE_LARGE_MAX_BYTES: ${SPECVOICE_PROFILE_LARGE_MAX_BYTES:-1000000000}
+  SPECVOICE_PROFILE_MAX_FILES: ${SPECVOICE_PROFILE_MAX_FILES:-100000}
+  SPECVOICE_PROFILE_MAX_BYTES: ${SPECVOICE_PROFILE_MAX_BYTES:-1000000000}
+  SPECVOICE_PROFILE_MAX_DURATION_MS: ${SPECVOICE_PROFILE_MAX_DURATION_MS:-30000}
+
+x-retention-environment: &retention-environment
+  SPECVOICE_TRANSCRIPT_RETENTION_DAYS: ${SPECVOICE_TRANSCRIPT_RETENTION_DAYS:-30}
+  SPECVOICE_METRICS_RETENTION_DAYS: ${SPECVOICE_METRICS_RETENTION_DAYS:-180}
+  SPECVOICE_INDEX_RETENTION_DAYS: ${SPECVOICE_INDEX_RETENTION_DAYS:-7}
+
+x-runtime: &runtime
+  build:
+    context: .
+    target: runtime
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-specvoice}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-specvoice-local}
+      POSTGRES_DB: ${POSTGRES_DB:-specvoice}
+    volumes: [specvoice-postgres:/var/lib/postgresql/data]
+    networks: [backend]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  web:
+    <<: *runtime
+    environment:
+      <<: [*profile-environment, *retention-environment]
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-specvoice}:${POSTGRES_PASSWORD:-specvoice-local}@postgres:5432/${POSTGRES_DB:-specvoice}
+      SPECVOICE_OPERATOR_PASSWORD_HASH: ${SPECVOICE_OPERATOR_PASSWORD_HASH:?Set SPECVOICE_OPERATOR_PASSWORD_HASH in .env}
+      SPECVOICE_OPERATOR_ORIGIN: ${SPECVOICE_OPERATOR_ORIGIN:-http://localhost:3000}
+      SESSION_CAPABILITY_SECRET: ${SESSION_CAPABILITY_SECRET:?Set SESSION_CAPABILITY_SECRET in .env}
+      GITHUB_TOKEN: ${GITHUB_READ_TOKEN:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      ELEVENLABS_AGENT_ID: ${ELEVENLABS_AGENT_ID:-}
+      ELEVENLABS_WEBHOOK_SECRET: ${ELEVENLABS_WEBHOOK_SECRET:-}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3001}
+    command: ['sh', '-c', 'npm run retention && exec npm run start']
+    ports: ['127.0.0.1:${SPECVOICE_PORT:-3000}:3000']
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [backend, egress]
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exitCode=1}).catch(()=>{process.exitCode=1})",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  provider-ingress:
+    <<: *runtime
+    command: ['node', '--import', 'tsx', 'src/provider-ingress.ts']
+    ports: ['127.0.0.1:${SPECVOICE_PROVIDER_PORT:-3001}:3001']
+    networks: [backend, ingress]
+    depends_on: [web]
+
+  egress-proxy:
+    <<: *runtime
+    environment:
+      SPECVOICE_EGRESS_ALLOWLIST: ${SPECVOICE_EGRESS_ALLOWLIST:-github.com,api.github.com,codeload.github.com,objects.githubusercontent.com,raw.githubusercontent.com,registry.npmjs.org,registry.yarnpkg.com}
+    command: ['npm', 'run', 'egress-proxy']
+    networks: [backend, execution, egress]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "const net=require(''net''); const s=net.connect(3128,''127.0.0.1'',()=>s.end()); s.on(''error'',()=>process.exit(1))"',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  model-gateway:
+    <<: *runtime
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-specvoice}:${POSTGRES_PASSWORD:-specvoice-local}@postgres:5432/${POSTGRES_DB:-specvoice}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SPECVOICE_SERVICE_SECRET: ${SPECVOICE_SERVICE_SECRET:?Set SPECVOICE_SERVICE_SECRET in .env}
+      SPECVOICE_BUILD_BUDGET_USD: ${SPECVOICE_BUILD_BUDGET_USD:-5}
+      SPECVOICE_EXECUTION_DEADLINE_MS: ${SPECVOICE_EXECUTION_DEADLINE_MS:-1800000}
+    command: ['node', '--import', 'tsx', 'src/model-gateway.ts']
+    networks: [backend, execution, egress]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  execution-image:
+    build:
+      context: .
+      target: execution
+      args:
+        CLAUDE_CODE_VERSION: 2.1.296
+    image: specvoice-execution:2.1.296
+    command: ['node', '--version']
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  execution-launcher:
+    build:
+      context: .
+      target: launcher
+    restart: unless-stopped
+    environment:
+      SPECVOICE_SERVICE_SECRET: ${SPECVOICE_SERVICE_SECRET:?Set SPECVOICE_SERVICE_SECRET in .env}
+      SPECVOICE_EXECUTION_NETWORK: ${COMPOSE_PROJECT_NAME:-specvoice}-execution
+      SPECVOICE_EXECUTION_IMAGE: specvoice-execution:2.1.296
+      SPECVOICE_BUILD_BUDGET_USD: ${SPECVOICE_BUILD_BUDGET_USD:-5}
+      SPECVOICE_EXECUTION_CPUS: ${SPECVOICE_EXECUTION_CPUS:-2}
+      SPECVOICE_EXECUTION_MEMORY_BYTES: ${SPECVOICE_EXECUTION_MEMORY_BYTES:-4294967296}
+      SPECVOICE_EXECUTION_WORKSPACE_BYTES: ${SPECVOICE_EXECUTION_WORKSPACE_BYTES:-2147483648}
+      SPECVOICE_EXECUTION_PIDS: ${SPECVOICE_EXECUTION_PIDS:-256}
+      SPECVOICE_EXECUTION_DEADLINE_MS: ${SPECVOICE_EXECUTION_DEADLINE_MS:-1800000}
+      SPECVOICE_INSTALL_SCRIPT_REPOS: ${SPECVOICE_INSTALL_SCRIPT_REPOS:-}
+    volumes: ['/var/run/docker.sock:/var/run/docker.sock']
+    networks: [backend]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 45s
+    depends_on:
+      execution-image: { condition: service_completed_successfully }
+      model-gateway: { condition: service_started }
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3202/health').then(r=>{if(!r.ok)process.exitCode=1}).catch(()=>{process.exitCode=1})",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    <<: *runtime
+    environment:
+      <<: [*profile-environment, *retention-environment]
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER:-specvoice}:${POSTGRES_PASSWORD:-specvoice-local}@postgres:5432/${POSTGRES_DB:-specvoice}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      SPECVOICE_SERVICE_SECRET: ${SPECVOICE_SERVICE_SECRET:?Set SPECVOICE_SERVICE_SECRET in .env}
+      SPECVOICE_EXECUTION_DEADLINE_MS: ${SPECVOICE_EXECUTION_DEADLINE_MS:-1800000}
+      SPECVOICE_EXECUTION_LAUNCHER_URL: http://execution-launcher:3202
+      SPECVOICE_MODEL_GATEWAY_URL: http://model-gateway:3201
+      HTTP_PROXY: http://egress-proxy:3128
+      HTTPS_PROXY: http://egress-proxy:3128
+      ALL_PROXY: http://egress-proxy:3128
+      NO_PROXY: postgres,egress-proxy,execution-launcher,model-gateway,localhost,127.0.0.1
+      NODE_USE_ENV_PROXY: '1'
+    command: ['node', '--import', 'tsx', 'src/workers/build-worker.ts']
+    stop_grace_period: 60s
+    depends_on:
+      postgres: { condition: service_healthy }
+      egress-proxy: { condition: service_healthy }
+      execution-launcher: { condition: service_healthy }
+    networks: [backend]
+    healthcheck:
+      test: ['CMD', 'node', '--import', 'tsx', 'src/scripts/worker-health.ts']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  specvoice-postgres:
+
+networks:
+  backend:
+    internal: true
+  execution:
+    name: ${COMPOSE_PROJECT_NAME:-specvoice}-execution
+    internal: true
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+  egress:
+  ingress:

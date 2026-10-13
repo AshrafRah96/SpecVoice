@@ -21,10 +21,11 @@ function sign(payload: string): string {
   return createHmac('sha256', secret()).update(payload).digest('base64url')
 }
 
-export function issueSessionCapability(sessionId: string, now = Date.now()): string {
+export function issueSessionCapability(sessionId: string, now = Date.now(), callId?: string): string {
   const payload = encode(
     JSON.stringify({
       sid: sessionId,
+      cid: callId,
       iat: now,
       exp: now + CAPABILITY_TTL_MS,
       jti: randomUUID(),
@@ -36,7 +37,8 @@ export function issueSessionCapability(sessionId: string, now = Date.now()): str
 export function verifySessionCapability(
   token: string | null | undefined,
   sessionId: string,
-  now = Date.now()
+  now = Date.now(),
+  callId?: string
 ): boolean {
   if (!token) return false
   const [payload, signature] = token.split('.')
@@ -52,9 +54,11 @@ export function verifySessionCapability(
       sid?: unknown
       exp?: unknown
       iat?: unknown
+      cid?: unknown
     }
     return (
       parsed.sid === sessionId &&
+      (!callId || parsed.cid === callId) &&
       typeof parsed.exp === 'number' &&
       typeof parsed.iat === 'number' &&
       parsed.iat <= now &&
@@ -82,7 +86,10 @@ export function unauthorizedResponse(): NextResponse {
 export function requireSessionCapability(
   request: NextRequest,
   sessionId: string,
-  bodyToken?: unknown
+  bodyToken?: unknown,
+  callId?: string
 ): NextResponse | null {
-  return verifySessionCapability(capabilityFromRequest(request, bodyToken), sessionId) ? null : unauthorizedResponse()
+  return verifySessionCapability(capabilityFromRequest(request, bodyToken), sessionId, Date.now(), callId)
+    ? null
+    : unauthorizedResponse()
 }

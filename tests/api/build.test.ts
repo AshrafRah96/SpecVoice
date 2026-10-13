@@ -3,12 +3,26 @@ import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/sessions/[id]/build/route'
 import { sessionStore } from '@/lib/session/store'
 import type { SessionEvent, ComplexityAssessment } from '@/lib/session/types'
-import { issueSessionCapability } from '@/lib/session/capability'
+import { operatorHeaders } from '../helpers/operator'
+import { getRepositorySnapshotStore } from '@/lib/repo/snapshot-store'
+import { profileRepository } from '@/lib/repo/profile'
+import { InMemoryCodeSource } from '@/lib/code/in-memory-source'
+import type { Session } from '@/lib/session/types'
+
+async function prepareProfile(session: Session) {
+  sessionStore.updateSession(session.id, { repositorySha: 'abc123' })
+  const snapshots = getRepositorySnapshotStore()
+  const snapshot = await snapshots.ensureForSession(session, 'abc123')
+  await snapshots.saveProfile(
+    snapshot.id,
+    await profileRepository(new InMemoryCodeSource({ 'README.md': 'fixture' }), 'abc123')
+  )
+}
 
 function makeRequest(id: string): NextRequest {
   return new NextRequest(`http://localhost/api/sessions/${id}/build`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${issueSessionCapability(id)}`, 'Idempotency-Key': `build-${id}` },
+    headers: { ...operatorHeaders(), 'Idempotency-Key': `build-${id}` },
   })
 }
 
@@ -44,6 +58,7 @@ describe('POST /api/sessions/[id]/build', () => {
       specOutput: '# Spec\n- step 1',
       buildStatus: 'ready',
     })
+    await prepareProfile(session)
     const res = await POST(makeRequest(session.id), { params: Promise.resolve({ id: session.id }) })
     expect(res.status).toBe(202)
     expect(await res.json()).toEqual({ accepted: true, replayed: false })
@@ -55,6 +70,7 @@ describe('POST /api/sessions/[id]/build', () => {
       buildStatus: 'ready',
       openQuestions: [{ id: 'q1', question: 'Migrate?', context: 'context', timestamp: new Date().toISOString() }],
     })
+    await prepareProfile(session)
 
     // Collect all events fired synchronously during the POST call
     const events: SessionEvent[] = []

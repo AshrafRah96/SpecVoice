@@ -1,0 +1,16 @@
+{
+  "id": "small-build",
+  "repositoryFiles": {
+    "src/index.ts": "needle"
+  },
+  "profileComplete": true,
+  "tier": "small",
+  "readPath": "src/index.ts",
+  "searchQuery": "needle",
+  "expected": {
+    "readStatus": 200,
+    "listedPaths": ["src/index.ts"],
+    "searchPaths": ["src/index.ts"],
+    "buildAllowed": true
+  }
+}

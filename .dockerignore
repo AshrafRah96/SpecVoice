@@ -1,0 +1,9 @@
+node_modules
+.next
+graphify-out
+.git
+.env*
+test-results
+
+.next-e2e/
+artifacts/

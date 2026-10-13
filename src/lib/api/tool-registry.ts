@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { sessionStore } from '@/lib/session/store'
+import { getSessionRepository } from '@/lib/session/runtime'
 import { generateSpec } from '@/lib/session/spec-generator'
 import { createToolHandler, createCodeToolHandler } from '@/lib/api/tool-handler'
 
@@ -28,9 +28,9 @@ export const toolRegistry = new ToolRegistry()
 // ── list-files ────────────────────────────────────────────────────────────────
 toolRegistry.register(
   'list-files',
-  createCodeToolHandler(z.object({ path: z.string().optional() }), async (_session, source, input) => {
-    const files = await source.listFiles(input.path)
-    return NextResponse.json({ files })
+  createCodeToolHandler(z.object({ path: z.string().optional() }), async (_session, source, input, request) => {
+    const files = await source.listFiles(input.path, { signal: request.signal })
+    return NextResponse.json(files)
   })
 )
 
@@ -43,13 +43,17 @@ toolRegistry.register(
       start_line: z.number().int().positive().optional(),
       end_line: z.number().int().positive().optional(),
     }),
-    async (session, source, input) => {
-      const content = await source.readFile(input.path, input.start_line, input.end_line)
-      sessionStore.recordFileRead(session.id, {
-        path: input.path,
-        timestamp: new Date().toISOString(),
-        characterCount: content.content.length,
-      })
+    async (session, source, input, request) => {
+      const content = await source.readFile(input.path, input.start_line, input.end_line, { signal: request.signal })
+      await getSessionRepository().recordFileRead(
+        session.id,
+        {
+          path: input.path,
+          timestamp: new Date().toISOString(),
+          characterCount: content.content.length,
+        },
+        session.currentCallId ?? undefined
+      )
       return NextResponse.json({ content })
     }
   )
@@ -63,9 +67,9 @@ toolRegistry.register(
       query: z.string(),
       max_results: z.number().int().positive().default(20).optional(),
     }),
-    async (_session, source, input) => {
-      const results = await source.searchCode(input.query, input.max_results)
-      return NextResponse.json({ results })
+    async (_session, source, input, request) => {
+      const results = await source.searchCode(input.query, input.max_results, { signal: request.signal })
+      return NextResponse.json(results)
     }
   )
 )
@@ -89,7 +93,7 @@ toolRegistry.register(
         relevantFiles: input.relevant_files,
         timestamp: new Date().toISOString(),
       }
-      sessionStore.addDecision(session.id, decision)
+      await getSessionRepository().addDecision(session.id, decision, session.currentCallId ?? undefined)
       return NextResponse.json({ decision })
     }
   )
@@ -110,7 +114,7 @@ toolRegistry.register(
         context: input.context,
         timestamp: new Date().toISOString(),
       }
-      sessionStore.flagQuestion(session.id, openQuestion)
+      await getSessionRepository().flagQuestion(session.id, openQuestion, session.currentCallId ?? undefined)
       return NextResponse.json({ question: openQuestion })
     }
   )
@@ -121,7 +125,7 @@ toolRegistry.register(
   'generate-spec',
   createToolHandler(z.object({}), async session => {
     const spec = generateSpec(session)
-    sessionStore.setSpec(session.id, spec)
+    await getSessionRepository().setSpec(session.id, spec, session.currentCallId ?? undefined)
     return NextResponse.json({ spec })
   })
 )

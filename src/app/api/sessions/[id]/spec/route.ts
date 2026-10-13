@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sessionStore } from '@/lib/session/store'
-import { requireSessionCapability } from '@/lib/session/capability'
-import { requireInMemorySessionStore } from '@/lib/session/deployment'
+import { getSessionRepository } from '@/lib/session/runtime'
+import { withOperator } from '@/lib/api/operator-handler'
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const GET = withOperator(async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const { id } = await params
-  const unavailable = requireInMemorySessionStore()
-  if (unavailable) return unavailable
-  const unauthorized = requireSessionCapability(request, id)
-  if (unauthorized) return unauthorized
-  const session = sessionStore.getSession(id)
+  const session = await getSessionRepository().getSession(id)
   if (!session) {
     return NextResponse.json({ error: `Session not found: ${id}` }, { status: 404 })
   }
@@ -22,4 +20,4 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     )
   }
   return NextResponse.json({ spec: session.specOutput })
-}
+})

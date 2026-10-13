@@ -1,3 +1,5 @@
+import { getRepositorySnapshotStore } from '@/lib/repo/snapshot-store'
+import { profileRepository } from '@/lib/repo/profile'
 import { describe, it, expect, afterEach } from 'vitest'
 import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
@@ -131,6 +133,13 @@ describe('createCodeToolHandler', () => {
       return NextResponse.json({ value: input.value })
     })
     const session = sessionStore.createSession()
+    sessionStore.updateSession(session.id, { repositorySha: 'fixture-commit' })
+    const snapshots = getRepositorySnapshotStore()
+    const snapshot = await snapshots.ensureForSession(session, 'fixture-commit')
+    await snapshots.saveProfile(
+      snapshot.id,
+      await profileRepository(new InMemoryCodeSource({ 'README.md': 'fixture' }), 'fixture-commit')
+    )
     deregister = registerCodeSource(session.id, new InMemoryCodeSource({ 'src/a.ts': 'hello' }))
     const req = makeRequest('http://localhost/api/tools/echo', {
       session_id: session.id,
@@ -150,8 +159,15 @@ describe('createCodeToolHandler', () => {
       return NextResponse.json({})
     })
     const session = sessionStore.createSession()
+    sessionStore.updateSession(session.id, { repositorySha: 'fixture-commit' })
+    const snapshots = getRepositorySnapshotStore()
+    const snapshot = await snapshots.ensureForSession(session, 'fixture-commit')
+    await snapshots.saveProfile(
+      snapshot.id,
+      await profileRepository(new InMemoryCodeSource({ 'README.md': 'fixture' }), 'fixture-commit')
+    )
     deregister = registerCodeSource(session.id, new InMemoryCodeSource({ 'src/foo.ts': 'export const x = 1' }))
     await handler(makeRequest('http://localhost/api/tools/read', { session_id: session.id, path: 'src/foo.ts' }))
-    expect(capturedContent).toBe('export const x = 1')
+    expect(capturedContent).toBe('1 | export const x = 1')
   })
 })

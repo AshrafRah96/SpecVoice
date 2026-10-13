@@ -1,0 +1,22 @@
+{
+  "id": "scope-confirmation",
+  "repositoryFiles": {
+    "apps/web/index.ts": "needle",
+    "apps/api/index.ts": "needle"
+  },
+  "profileComplete": true,
+  "tier": "large",
+  "scope": {
+    "includedRoots": ["apps/web"],
+    "excludedRoots": [],
+    "confirmed": false
+  },
+  "readPath": "apps/web/index.ts",
+  "searchQuery": "needle",
+  "expected": {
+    "readStatus": 200,
+    "listedPaths": ["apps/web/index.ts", "apps/api/index.ts"],
+    "searchPaths": ["apps/web/index.ts", "apps/api/index.ts"],
+    "buildAllowed": false
+  }
+}

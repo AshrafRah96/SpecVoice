@@ -11,6 +11,8 @@ interface Props {
   buildLog: BuildLogEntry[]
   onTriggerBuild: () => Promise<void>
   error: string | null
+  readiness: string | null
+  onRecoverBuild: () => Promise<void>
 }
 
 function groupLabel(group: string[]): string {
@@ -19,7 +21,7 @@ function groupLabel(group: string[]): string {
   return `${dir}/: ${group.length} file${group.length !== 1 ? 's' : ''}`
 }
 
-export function BuildPanel({ session, buildLog, onTriggerBuild, error }: Props) {
+export function BuildPanel({ session, buildLog, onTriggerBuild, onRecoverBuild, readiness, error }: Props) {
   if (!session) return null
 
   const { buildStatus, prUrl, complexityAssessment } = session
@@ -28,9 +30,10 @@ export function BuildPanel({ session, buildLog, onTriggerBuild, error }: Props) 
     <div className="p-5 flex flex-col gap-4">
       <h2 className="text-xs font-medium tracking-widest uppercase text-muted-foreground">Build</h2>
 
+      {readiness && <p data-testid="build-readiness">{readiness}</p>}
       {/* Ready to build */}
       {buildStatus === 'ready' && (
-        <Button data-testid="build-button" onClick={onTriggerBuild} size="lg" className="w-full">
+        <Button data-testid="build-button" disabled={!!readiness} onClick={onTriggerBuild} size="lg" className="w-full">
           Build It
         </Button>
       )}
@@ -39,7 +42,7 @@ export function BuildPanel({ session, buildLog, onTriggerBuild, error }: Props) 
       {buildStatus === 'building' && (
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <LiveWaveform active bars={8} className="h-4" />
-          <span>Claude Code is working…</span>
+          <span>{session.buildRecovery ? 'Recovering publication…' : 'Claude Code is working…'}</span>
         </div>
       )}
 
@@ -67,8 +70,11 @@ export function BuildPanel({ session, buildLog, onTriggerBuild, error }: Props) 
           <p className="text-xs rounded-md px-3 py-2 bg-destructive-muted text-destructive border border-destructive/20">
             {error ?? 'Build failed. Check logs.'}
           </p>
-          <Button variant="outline" size="sm" className="w-full" onClick={onTriggerBuild}>
-            Retry
+          {session.buildRecovery?.retryable && (
+            <Button onClick={onRecoverBuild}>Retry recovery without generation</Button>
+          )}
+          <Button variant="outline" size="sm" className="w-full" disabled={!!readiness} onClick={onTriggerBuild}>
+            Retry Build (uses model quota)
           </Button>
         </div>
       )}

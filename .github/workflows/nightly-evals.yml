@@ -1,0 +1,47 @@
+name: Live provider evaluations
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  elevenlabs:
+    name: ElevenLabs live evaluation (warn-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    env:
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      ELEVENLABS_AGENT_ID: ${{ secrets.ELEVENLABS_AGENT_ID }}
+      SPECVOICE_LIVE_EVAL_ESTIMATE_USD: ${{ vars.SPECVOICE_LIVE_EVAL_ESTIMATE_USD }}
+      SPECVOICE_LIVE_BUDGET_USD: '10'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Check provider credentials
+        id: credentials
+        run: |
+          if [ -n "$ELEVENLABS_API_KEY" ] && [ -n "$ELEVENLABS_AGENT_ID" ] && [ -n "$SPECVOICE_LIVE_EVAL_ESTIMATE_USD" ]; then
+            echo enabled=true >> "$GITHUB_OUTPUT"
+          else
+            echo enabled=false >> "$GITHUB_OUTPUT"
+            echo 'Live evaluation credentials or cost estimate are not configured; skipping paid checks.'
+          fi
+      - run: npm run test:agent
+        if: steps.credentials.outputs.enabled == 'true'
+      - name: Preserve prompt-version scores and estimates
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-evaluations-${{ github.run_id }}
+          path: artifacts/evals/
+          if-no-files-found: ignore
+          retention-days: 90

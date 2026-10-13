@@ -5,6 +5,7 @@ const envSchema = z.object({
   ELEVENLABS_AGENT_ID: z.string().optional(),
   GITHUB_TOKEN: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().default('http://localhost:3000'),
+  DATABASE_URL: z.preprocess(value => (value === '' ? undefined : value), z.string().url().optional()),
   ANTHROPIC_API_KEY: z.string().optional(),
   ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
   SESSION_CAPABILITY_SECRET: z.preprocess(value => (value === '' ? undefined : value), z.string().min(32).optional()),

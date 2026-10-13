@@ -19,12 +19,14 @@ function makeSession(overrides: Record<string, unknown> = {}) {
 
 function captureEvents(sessionId: string): SessionEvent[] {
   const events: SessionEvent[] = []
-  sessionStore.subscribe(sessionId, (e) => events.push(e))
+  sessionStore.subscribe(sessionId, e => events.push(e))
   return events
 }
 
 describe('BuildPipeline.run', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('warns and returns silently when session is not found', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -36,9 +38,7 @@ describe('BuildPipeline.run', () => {
 
   it('blocks when session has open questions: resets to ready, emits build_blocked', async () => {
     const session = makeSession({
-      openQuestions: [
-        { id: 'q1', question: 'Migrate?', context: 'ctx', timestamp: new Date().toISOString() },
-      ],
+      openQuestions: [{ id: 'q1', question: 'Migrate?', context: 'ctx', timestamp: new Date().toISOString() }],
     })
     const events = captureEvents(session.id)
     const pipeline = new BuildPipeline(new FakeProcessRunner(), passingPrereqs, new StubWorkflowSteps())
@@ -54,11 +54,17 @@ describe('BuildPipeline.run', () => {
   it('sets buildStatus to failed and emits build_failed when prerequisites fail', async () => {
     const session = makeSession()
     const events = captureEvents(session.id)
-    const pipeline = new BuildPipeline(new FakeProcessRunner(), failingPrereqs('claude CLI not found'), new StubWorkflowSteps())
+    const pipeline = new BuildPipeline(
+      new FakeProcessRunner(),
+      failingPrereqs('claude CLI not found'),
+      new StubWorkflowSteps()
+    )
     await pipeline.run(session.id)
 
     expect(sessionStore.getSession(session.id)!.buildStatus).toBe('failed')
-    const failEvent = events.find(e => e.type === 'build_failed') as Extract<SessionEvent, { type: 'build_failed' }> | undefined
+    const failEvent = events.find(e => e.type === 'build_failed') as
+      | Extract<SessionEvent, { type: 'build_failed' }>
+      | undefined
     expect(failEvent?.error).toContain('claude CLI not found')
   })
 
@@ -69,7 +75,9 @@ describe('BuildPipeline.run', () => {
     await pipeline.run(session.id)
 
     expect(sessionStore.getSession(session.id)!.buildStatus).toBe('failed')
-    const failEvent = events.find(e => e.type === 'build_failed') as Extract<SessionEvent, { type: 'build_failed' }> | undefined
+    const failEvent = events.find(e => e.type === 'build_failed') as
+      | Extract<SessionEvent, { type: 'build_failed' }>
+      | undefined
     expect(failEvent?.error).toContain('no repository URL')
   })
 
@@ -107,18 +115,16 @@ describe('BuildPipeline.run', () => {
     await pipeline.run(session.id)
 
     expect(sessionStore.getSession(session.id)!.buildStatus).toBe('failed')
-    const failEvent = events.find(e => e.type === 'build_failed') as Extract<SessionEvent, { type: 'build_failed' }> | undefined
+    const failEvent = events.find(e => e.type === 'build_failed') as
+      | Extract<SessionEvent, { type: 'build_failed' }>
+      | undefined
     expect(failEvent?.error).toContain('subprocess crashed')
   })
 
   it('cleans up tmpDir even when runner throws', async () => {
     const steps = new StubWorkflowSteps()
     const session = makeSession()
-    const pipeline = new BuildPipeline(
-      new FakeProcessRunner({ error: new Error('boom') }),
-      passingPrereqs,
-      steps
-    )
+    const pipeline = new BuildPipeline(new FakeProcessRunner({ error: new Error('boom') }), passingPrereqs, steps)
     await pipeline.run(session.id)
     expect(steps.cleanedDir).toBe('/tmp/stub-clone')
   })

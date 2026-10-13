@@ -3,18 +3,14 @@ import { NextRequest } from 'next/server'
 import { GET as getSession } from '@/app/api/sessions/[id]/route'
 import { GET as getSpec } from '@/app/api/sessions/[id]/spec/route'
 import { sessionStore } from '@/lib/session/store'
-import { issueSessionCapability } from '@/lib/session/capability'
+import { operatorHeaders } from '../helpers/operator'
 
 function makeRequest(url: string): NextRequest {
-  const id =
-    url.split('/').filter(Boolean).at(-1) === 'spec'
-      ? url.split('/').filter(Boolean).at(-2)!
-      : url.split('/').filter(Boolean).at(-1)!
-  return new NextRequest(url, { headers: { Authorization: `Bearer ${issueSessionCapability(id)}` } })
+  return new NextRequest(url, { headers: { ...operatorHeaders() } })
 }
 
 describe('GET /api/sessions/[id]', () => {
-  it('rejects requests without a capability', async () => {
+  it('rejects requests without operator authentication', async () => {
     const res = await getSession(new NextRequest('http://localhost/api/sessions/no-such'), {
       params: Promise.resolve({ id: 'no-such' }),
     })

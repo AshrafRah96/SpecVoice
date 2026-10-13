@@ -1,12 +1,18 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { POST } from '@/app/api/sessions/route'
 import { NextRequest } from 'next/server'
+import { operatorHeaders } from '../helpers/operator'
+import { InMemoryCodeSource } from '@/lib/code/in-memory-source'
+
+vi.mock('@/lib/code', () => ({
+  resolveCodeSource: vi.fn(() => new InMemoryCodeSource({ 'README.md': 'fixture' }, 'abc123')),
+}))
 
 function makeRequest(body: unknown) {
   return new NextRequest('http://localhost:3000/api/sessions', {
     method: 'POST',
     body: JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...operatorHeaders(), 'Content-Type': 'application/json' },
   })
 }
 
@@ -19,6 +25,7 @@ describe('POST /api/sessions', () => {
     expect(body.session.repoUrl).toBe('https://github.com/test/repo')
     expect(body.session.buildStatus).toBe('idle')
     expect(body.session.status).toBe('active')
+    expect(body.session.repositorySha).toBe('abc123')
     expect(body.session.decisions).toEqual([])
   })
 

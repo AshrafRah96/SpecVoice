@@ -1,0 +1,39 @@
+# Add explicitly: docker compose -f docker-compose.yml -f docker-compose.backup.yml up -d backup
+services:
+  backup:
+    build:
+      context: .
+      target: backup
+    restart: unless-stopped
+    user: '${SPECVOICE_BACKUP_UID:-1000}:${SPECVOICE_BACKUP_GID:-1000}'
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-specvoice}:${POSTGRES_PASSWORD:-specvoice-local}@postgres:5432/${POSTGRES_DB:-specvoice}
+      RESTIC_REPOSITORY: /backup/repository
+      RESTIC_PASSWORD_FILE: /run/secrets/backup_password
+      SPECVOICE_BACKUP_VOLUME_ID: ${SPECVOICE_BACKUP_VOLUME_ID:?Configure the external volume marker with the wizard}
+      SPECVOICE_TRANSCRIPT_RETENTION_DAYS: ${SPECVOICE_TRANSCRIPT_RETENTION_DAYS:-30}
+      SPECVOICE_METRICS_RETENTION_DAYS: ${SPECVOICE_METRICS_RETENTION_DAYS:-180}
+      SPECVOICE_INDEX_RETENTION_DAYS: ${SPECVOICE_INDEX_RETENTION_DAYS:-7}
+    volumes:
+      - type: bind
+        source: ${SPECVOICE_BACKUP_DESTINATION:?Configure a mounted second disk or NAS}
+        target: /backup
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SPECVOICE_BACKUP_PASSWORD_FILE:?Configure the local recovery-password file}
+        target: /run/secrets/backup_password
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [backend]
+    read_only: true
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=536870912,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 1g
+    cpus: 1
+    stop_grace_period: 30s
+    depends_on:
+      postgres: { condition: service_healthy }

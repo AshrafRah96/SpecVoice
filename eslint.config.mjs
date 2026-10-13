@@ -6,9 +6,9 @@ export default [
   ...nextConfig.map(config => {
     // Inject react version so eslint-plugin-react doesn't call getFilename() for detection
     if (config.settings) {
-      config.settings = { ...config.settings, react: { version: '18' } }
+      config.settings = { ...config.settings, react: { version: '19' } }
     } else if (config.plugins?.react) {
-      config.settings = { react: { version: '18' } }
+      config.settings = { react: { version: '19' } }
     }
     return config
   }),

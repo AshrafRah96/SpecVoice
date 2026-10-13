@@ -117,11 +117,13 @@ describe('ClaudeOutputParser.feed — progress events', () => {
 
   it('returns the first tool_use block when multiple blocks are present', () => {
     const parser = new ClaudeOutputParser()
-    const result = parser.feed(assistantLine([
-      { type: 'text' },
-      toolUse('Read', { file_path: 'first.ts' }),
-      toolUse('Write', { file_path: 'second.ts' }),
-    ]))
+    const result = parser.feed(
+      assistantLine([
+        { type: 'text' },
+        toolUse('Read', { file_path: 'first.ts' }),
+        toolUse('Write', { file_path: 'second.ts' }),
+      ])
+    )
     expect(result).toEqual({ type: 'progress', phase: 'analyzing', detail: 'first.ts' })
   })
 })

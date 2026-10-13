@@ -3,6 +3,10 @@ import { guardBuildTransition } from '@/lib/session/build-state-machine'
 import type { BuildStatus } from '@/lib/session/types'
 
 describe('guardBuildTransition', () => {
+  it('allows failed → building for an explicit retry', () => {
+    expect(() => guardBuildTransition('failed', 'building', 'sess-1')).not.toThrow()
+  })
+
   it('allows idle → ready', () => {
     expect(() => guardBuildTransition('idle', 'ready', 'sess-1')).not.toThrow()
   })
@@ -25,6 +29,11 @@ describe('guardBuildTransition', () => {
 
   it('allows failed → ready (retry)', () => {
     expect(() => guardBuildTransition('failed', 'ready', 'sess-1')).not.toThrow()
+  })
+
+  it('allows a completed Session to save a new Spec before another explicit Build', () => {
+    expect(() => guardBuildTransition('complete', 'ready', 'sess-1')).not.toThrow()
+    expect(() => guardBuildTransition('complete', 'building', 'sess-1')).toThrow()
   })
 
   it('is a no-op when transitioning to the same status', () => {

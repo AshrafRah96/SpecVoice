@@ -1,3 +1,5 @@
+import { getRepositorySnapshotStore } from '@/lib/repo/snapshot-store'
+import { profileRepository } from '@/lib/repo/profile'
 import { describe, it, expect, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { sessionStore } from '@/lib/session/store'
@@ -123,6 +125,13 @@ describe('toolRegistry.dispatch — list-files', () => {
 
   it('returns files from the code source', async () => {
     const session = sessionStore.createSession()
+    sessionStore.updateSession(session.id, { repositorySha: 'fixture-commit' })
+    const snapshots = getRepositorySnapshotStore()
+    const snapshot = await snapshots.ensureForSession(session, 'fixture-commit')
+    await snapshots.saveProfile(
+      snapshot.id,
+      await profileRepository(new InMemoryCodeSource({ 'README.md': 'fixture' }), 'fixture-commit')
+    )
     deregister = registerCodeSource(session.id, new InMemoryCodeSource({ 'src/a.ts': 'hello' }))
     const res = await toolRegistry.dispatch('list-files', makeRequest({ session_id: session.id }))
     expect(res.status).toBe(200)
@@ -141,6 +150,13 @@ describe('toolRegistry.dispatch — read-file', () => {
 
   it('returns file content and records the read', async () => {
     const session = sessionStore.createSession()
+    sessionStore.updateSession(session.id, { repositorySha: 'fixture-commit' })
+    const snapshots = getRepositorySnapshotStore()
+    const snapshot = await snapshots.ensureForSession(session, 'fixture-commit')
+    await snapshots.saveProfile(
+      snapshot.id,
+      await profileRepository(new InMemoryCodeSource({ 'README.md': 'fixture' }), 'fixture-commit')
+    )
     deregister = registerCodeSource(session.id, new InMemoryCodeSource({ 'src/a.ts': 'export const x = 1' }))
     const res = await toolRegistry.dispatch(
       'read-file',
@@ -165,6 +181,13 @@ describe('toolRegistry.dispatch — search-code', () => {
 
   it('returns matching search results', async () => {
     const session = sessionStore.createSession()
+    sessionStore.updateSession(session.id, { repositorySha: 'fixture-commit' })
+    const snapshots = getRepositorySnapshotStore()
+    const snapshot = await snapshots.ensureForSession(session, 'fixture-commit')
+    await snapshots.saveProfile(
+      snapshot.id,
+      await profileRepository(new InMemoryCodeSource({ 'README.md': 'fixture' }), 'fixture-commit')
+    )
     deregister = registerCodeSource(session.id, new InMemoryCodeSource({ 'src/a.ts': 'export const hello = 1' }))
     const res = await toolRegistry.dispatch(
       'search-code',

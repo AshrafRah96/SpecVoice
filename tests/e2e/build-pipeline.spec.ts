@@ -1,8 +1,15 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test'
 import path from 'path'
-import { loadEnvVar, buildSignedPostCallRequest } from './helpers'
+import { TEST_OPERATOR_PASSPHRASE, TEST_WEBHOOK_SECRET, buildSignedPostCallRequest, testCapability } from './helpers'
 
 const fixturePath = path.resolve('./tests/fixtures/sample-repo')
+
+test.beforeEach(async ({ page, request }) => {
+  for (const client of [page.request, request]) {
+    const response = await client.post('/api/operator', { data: { passphrase: TEST_OPERATOR_PASSPHRASE } })
+    expect(response.status()).toBe(200)
+  }
+})
 
 // ── Shared setup ─────────────────────────────────────────────────────────────
 
@@ -29,7 +36,7 @@ async function createLocalSession(page: Page): Promise<{ id: string; capability:
   )
   await page.getByRole('button', { name: 'Start Session' }).click()
   const response = await responsePromise
-  const responseBody = (await response.json()) as { capability: string }
+  expect(response.status()).toBe(201)
 
   const sessionIdLocator = page.locator('[data-testid="session-id"]')
   await expect(sessionIdLocator).toBeVisible({ timeout: 5000 })
@@ -40,8 +47,8 @@ async function createLocalSession(page: Page): Promise<{ id: string; capability:
     timeout: 5000,
   })
 
-  expect(responseBody.capability).toBeTruthy()
-  return { id: sessionId!, capability: responseBody.capability }
+  await expect(page.getByTestId('profile-status')).toHaveText('ready')
+  return { id: sessionId!, capability: testCapability(sessionId!) }
 }
 
 /**
@@ -76,7 +83,7 @@ async function driveSessionToReady(
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test('build_blocked — open question blocks build and keeps Build It visible', async ({ page, request }) => {
-  const webhookSecret = loadEnvVar('ELEVENLABS_WEBHOOK_SECRET')
+  const webhookSecret = TEST_WEBHOOK_SECRET
   const session = await createLocalSession(page)
 
   // Flag an open question before triggering the build — this will block it.
@@ -111,7 +118,7 @@ test('build_failed — fast failure surfaces error and shows Retry button', asyn
   // in executeBuild after prerequisites pass — a reliable fast path.
   // If prerequisites themselves fail (missing claude CLI or credentials), the
   // test still passes because any build_failed path produces the same UI state.
-  const webhookSecret = loadEnvVar('ELEVENLABS_WEBHOOK_SECRET')
+  const webhookSecret = TEST_WEBHOOK_SECRET
   const session = await createLocalSession(page)
 
   await driveSessionToReady(request, session, webhookSecret)
@@ -126,4 +133,46 @@ test('build_failed — fast failure surfaces error and shows Retry button', asyn
   // Give a generous timeout: executeBuild is async but the failure is synchronous
   // (no network I/O involved on the fast-fail paths).
   await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible({ timeout: 10000 })
+})
+
+test('profile and explicit scope confirmation gate Builds', async ({ page, request }) => {
+  const session = await createLocalSession(page)
+  await expect(page.getByText(/Commit: [a-f0-9]{40}/)).toBeVisible()
+  await expect(page.getByTestId('profile-status')).toHaveText('ready')
+  await driveSessionToReady(request, session, TEST_WEBHOOK_SECRET)
+  await expect(page.getByTestId('build-button')).toBeEnabled()
+  await page.getByLabel('Included paths').fill('README.md')
+  await page.getByRole('button', { name: 'Save Scope Plan' }).click()
+  await expect(page.getByTestId('scope-status')).toContainText('proposed')
+  await expect(page.getByTestId('build-button')).toBeDisabled()
+  await page.getByLabel('Included paths').fill('src')
+  await expect(page.getByRole('button', { name: 'Confirm Scope Plan' })).toBeDisabled()
+  await page.getByLabel('Included paths').fill('README.md')
+  await page.getByRole('button', { name: 'Confirm Scope Plan' }).click()
+  await expect(page.getByTestId('scope-status')).toContainText('confirmed · 1 files')
+  await expect(page.getByTestId('build-button')).toBeEnabled()
+  let expired = true
+  const profileUrl = `**/api/sessions/${session.id}/profile`
+  await page.route(profileUrl, async route => {
+    const response = await route.fetch()
+    if (route.request().method() === 'POST') expired = false
+    const body = await response.json()
+    if (expired && body.snapshot) {
+      body.snapshot.indexStatus = 'expired'
+      body.snapshot.profile = null
+    }
+    await route.fulfill({ response, json: body })
+  })
+  await page.reload()
+  await expect(page.getByTestId('profile-status')).toHaveText('expired')
+  await expect(page.getByTestId('build-button')).toBeDisabled()
+  await page.getByRole('button', { name: 'Rebuild profile' }).click()
+  await expect(page.getByTestId('profile-status')).toHaveText('ready')
+  await expect(page.getByTestId('scope-status')).toContainText('confirmed · 1 files')
+  await expect(page.getByTestId('build-button')).toBeEnabled()
+  await page.unroute(profileUrl)
+  await page.getByLabel('Included paths').fill('src')
+  await page.getByRole('button', { name: 'Save Scope Plan' }).click()
+  await expect(page.getByTestId('scope-status')).toContainText('proposed')
+  await expect(page.getByTestId('build-button')).toBeDisabled()
 })

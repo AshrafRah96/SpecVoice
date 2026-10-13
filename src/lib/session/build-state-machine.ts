@@ -4,8 +4,8 @@ const VALID_TRANSITIONS: Record<BuildStatus, BuildStatus[]> = {
   idle: ['ready'],
   ready: ['building'],
   building: ['ready', 'complete', 'failed'],
-  complete: [],
-  failed: ['ready'],
+  complete: ['ready'],
+  failed: ['ready', 'building'],
 }
 
 export function guardBuildTransition(from: BuildStatus, to: BuildStatus, sessionId: string): void {
