@@ -1,16 +1,32 @@
 # API Reference
 
-All routes are Next.js App Router handlers (`src/app/api/`). All request and response bodies are JSON. Session reads, SSE, builds, and tool webhooks require the short-lived capability returned by session creation. Tool requests include `session_id` and `session_token`; both are injected automatically by the ElevenLabs agent at runtime via `dynamicVariable` bindings.
+Routes use Next.js App Router handlers (`src/app/api/`). JSON except for SSE and Spec downloads. Operator login cookies protect Session reads and mutations, including SSE and Builds. Voice tool webhooks instead require a fresh call-bound `session_token` alongside `session_id`; ElevenLabs injects those dynamic variables. Signed post-call callbacks authenticate independently with HMAC.
 
-Shared types for all request/response shapes live in [src/lib/session/types.ts](../src/lib/session/types.ts).
+Shared request/response types: [src/lib/session/types.ts](../src/lib/session/types.ts).
 
 ---
+
+## Operator authentication
+
+`POST /api/operator` accepts `{ "passphrase": "<local operator passphrase>" }` and sets an opaque HttpOnly, SameSite=Strict cookie lasting eight hours. HTTPS origins use Secure cookies. Failed logins return `401`; the shared login quota returns `429`. Session mutations require a same-origin request. `DELETE /api/operator` immediately revokes the cookie; accepted background work continues.
+
+### `GET /api/sessions`
+
+Returns `{ "sessions": [...], "next": "<cursor-or-null>" }`, with up to 20 summary records. Pass `?before=<next>` for the next page. Session URLs use `/?session=<id>`; no provider capability is stored in the URL.
+
+### `POST /api/sessions/:id/call`
+
+Requires operator login and a ready/partial profile matching the pinned commit. Returns `{ "callId": "<uuid>", "signedUrl": "<private provider URL>", "capability": "<60-minute call capability>", "maxDurationSecs": 2700 }` with `Cache-Control: no-store`. Pass `session_id`, `session_token` and `call_id` as voice dynamic variables. The signed URL and capability are credentials: do not log them.
+
+An active call returns `409`, five starts within 15 minutes exhaust the per-Session quota (`429`), missing configuration/storage returns `503`, and failed provider startup returns `502`. Calls last at most 45 minutes; continuing a saved Session issues new credentials.
+
+`DELETE` on the same route accepts `{ "callId": "<uuid>" }` to mark a disconnected call awaiting its transcript. `{ "callId": "<uuid>", "failed": true }` explicitly abandons an active or pending call; delayed callbacks cannot revive it. Saved Specs and decisions remain. Builds reject active/awaiting calls with `409`.
 
 ## Sessions
 
 ### `POST /api/sessions`
 
-Creates a new session. Returns 201 with the full session object.
+Pins an immutable repository commit, creates a Session, and starts asynchronous profiling. Returns 201 with the Session.
 
 **Request body** (exactly one of `repoUrl` or `repoLocalPath` is required):
 
@@ -27,6 +43,7 @@ Creates a new session. Returns 201 with the full session object.
   "session": {
     "id": "sess_abc123",
     "repoUrl": "https://github.com/org/repo",
+    "repositorySha": "<resolved-commit-sha>",
     "decisions": [],
     "openQuestions": [],
     "filesRead": [],
@@ -38,22 +55,21 @@ Creates a new session. Returns 201 with the full session object.
     "complexityAssessment": null,
     "createdAt": "2026-03-31T10:00:00.000Z",
     "updatedAt": "2026-03-31T10:00:00.000Z"
-  },
-  "capability": "<short-lived-signed-capability>"
+  }
 }
 ```
 
 For a local source, use an absolute path below `SPECVOICE_LOCAL_REPO_ROOT`.
 
-**Errors:** `400` if both or neither source is provided, if `repoUrl` is not a valid URL, or if a local path is outside the configured root.
+**Errors:** `400` if both or neither source is provided, if `repoUrl` is not a valid URL, if a local path is outside the configured root, or if its Git commit cannot be resolved. Local sources require committed Git content.
 
 ---
 
 ### `GET /api/sessions/:id`
 
-Returns the current state of a session.
+Returns current Session state.
 
-**Headers:** `Authorization: Bearer <capability>`
+**Authentication:** operator login cookie.
 
 **Response `200`:**
 
@@ -67,11 +83,11 @@ Returns the current state of a session.
 
 ### `GET /api/sessions/:id/events`
 
-Opens a Server-Sent Events stream. The connection stays open until the client disconnects.
+Opens a Server-Sent Events stream until the client disconnects.
 
-**Query:** `?capability=<capability>` (the browser `EventSource` API cannot set an authorization header).
+**Authentication:** operator login cookie, sent by same-origin `EventSource`. No capability query parameter is required. The stream closes when the login expires or is revoked.
 
-On connection, the server sends the current session state as a `session_updated` event so clients don't need to poll `GET /api/sessions/:id` first.
+Without a replay cursor, sends current Session state as `session_updated`; no initial `GET /api/sessions/:id` needed. Each message has an SSE `id`; send the last received value in the `Last-Event-ID` header after reconnecting to replay missed durable events. Native EventSource handles this automatically. Replay drains all pages; periodic polling recovers missed notifications.
 
 **Response headers:**
 
@@ -82,23 +98,24 @@ Connection: keep-alive
 X-Accel-Buffering: no
 ```
 
-**Event format:** Each message is a newline-delimited JSON object prefixed with `data: `.
+**Event format:** Each message has an ordered `id` and a newline-delimited JSON object prefixed with `data: `.
 
 ```
+id: 42
 data: {"type":"session_updated","session":{...}}\n\n
 ```
 
-See [SSE Events](#sse-events) for the full event catalog.
+Full catalog: [SSE Events](#sse-events).
 
 ---
 
 ### `POST /api/sessions/:id/build`
 
-Triggers the post-call build pipeline. Returns 202 immediately; the build runs in the background and streams progress via SSE.
+Starts the post-call build pipeline. Returns 202 immediately; background progress streams via SSE.
 
 **Request body:** none required.
 
-**Headers:** `Authorization: Bearer <capability>` and `Idempotency-Key: <unique-build-attempt-key>`
+**Headers:** operator login cookie and `Idempotency-Key: <unique-build-attempt-key>`
 
 **Response `202`:**
 
@@ -108,26 +125,57 @@ Triggers the post-call build pipeline. Returns 202 immediately; the build runs i
 
 **Errors:**
 
-| Status | Condition                                              |
-| ------ | ------------------------------------------------------ |
-| `400`  | `session.specOutput` is absent — no spec to build from |
-| `401`  | Missing or invalid session capability                  |
-| `404`  | Session not found                                      |
-| `409`  | Another build attempt is already in progress           |
+| Status | Condition                                                                                          |
+| ------ | -------------------------------------------------------------------------------------------------- |
+| `400`  | `session.specOutput` is absent — no spec to build from                                             |
+| `401`  | Missing, expired or revoked operator login                                                         |
+| `404`  | Session not found                                                                                  |
+| `409`  | Profile is not ready, Scope Plan is not confirmed, or another build attempt is already in progress |
 
-`buildStatus` is set to `'building'` synchronously before the 202 is returned. Subsequent SSE events arrive asynchronously.
+Profiles still `pending` or `indexing` return `409` until profiling finishes. `mid`, `large`, `very-large`, and every partial profile require a confirmed Scope Plan. Any existing proposed plan also blocks Build until confirmed.
 
-See [Build Pipeline](./build-pipeline.md) for gate logic and the full phase sequence.
+`buildStatus` becomes `'building'` synchronously before the 202 response. Later SSE events arrive asynchronously.
+
+A recovery-only retry uses the same route with `Content-Type: application/json` and `{ "retryAttemptId": "123" }`. It returns `202 { "accepted": true, "recoveryOnly": true }` only for an eligible failed publication attempt. It preserves the original commit, branch, and inputs; it never runs Claude. An ineligible or concurrent retry returns `409`. A new no-body Build request may generate code again and consumes model quota.
+
+Gate logic and phases: [Build Pipeline](./build-pipeline.md).
+
+### `POST /api/sessions/:id/profile`
+
+Retries failed profiling at the Session's pinned commit; creation schedules the initial profile. Legacy unpinned Sessions resolve a commit on their first profile request. Returns `202` with the snapshot ID; the worker records `ready`, `partial`, or `failed` status.
+
+```json
+{ "accepted": true, "snapshotId": "snapshot-id", "status": "pending" }
+```
+
+### `GET /api/sessions/:id/profile`
+
+Returns current Repository snapshot, profile, and Scope Plan.
+
+### `POST /api/sessions/:id/scope`
+
+Proposes a bounded Scope Plan after the profile is ready. Mid, large, very-large, and partially profiled repositories require at least one literal `includedRoots` path. File roots and directory roots are supported; traversal, absolute paths, and patterns are rejected.
+
+```json
+{
+  "includedRoots": ["services/api"],
+  "excludedRoots": ["services/api/generated"],
+  "dependencyBoundaries": ["packages/shared"],
+  "reason": "Implement the API change in one service"
+}
+```
+
+Confirm a proposed plan with `{ "planId": "...", "confirm": true }`. The server inventories the selected scope and computes counts; client estimates are ignored. Empty or incomplete inventories return `409`. Saving changed paths creates a new proposal and invalidates the old confirmation. Profile/scope routes require the operator login cookie.
 
 ---
 
 ## Tool Webhooks
 
-These routes are called by the ElevenLabs agent during a conversation. They are not intended to be called directly from the dashboard or browser. All receive `session_id` and `session_token` in the request body (injected by the agent at runtime).
+ElevenLabs calls these routes during conversations. They are not intended to be called directly from the dashboard or browser. All receive `session_id` and `session_token` in the request body (injected by the agent at runtime). Code discovery requires a ready or partial pinned Profile (`409` otherwise). Confirmed scope applies before work; per-operation budgets bound discovery before confirmation too.
 
 ### `POST /api/tools/list-files`
 
-Lists files in the repo. Does not mutate session state — no SSE event fires.
+Lists repo files. No Session mutation or SSE event.
 
 **Request body:**
 
@@ -149,7 +197,8 @@ Lists files in the repo. Does not mutate session state — no SSE event fires.
     { "path": "src/components", "type": "dir" },
     { "path": "src/components/Dashboard.tsx", "type": "file" },
     { "path": "src/components/SessionControls.tsx", "type": "file" }
-  ]
+  ],
+  "complete": true
 }
 ```
 
@@ -157,7 +206,7 @@ Lists files in the repo. Does not mutate session state — no SSE event fires.
 
 ### `POST /api/tools/read-file`
 
-Reads a file from the repo. Capped at 4000 characters. Appends a `FileRead` entry to `session.filesRead` and broadcasts `session_updated`.
+Reads a repo file. Capped at 4000 characters. Appends `FileRead` to `session.filesRead` and broadcasts `session_updated`.
 
 **Request body:**
 
@@ -192,7 +241,7 @@ Reads a file from the repo. Capped at 4000 characters. Appends a `FileRead` entr
 
 ### `POST /api/tools/search-code`
 
-Searches the repo for a query string. Does not mutate session state — no SSE event fires.
+Searches the repo for a query string. No Session mutation or SSE event.
 
 **Request body:**
 
@@ -205,7 +254,7 @@ Searches the repo for a query string. Does not mutate session state — no SSE e
 }
 ```
 
-`max_results` defaults to 20.
+`max_results` defaults to 20 and counts only permitted results. Listing and search add `complete`; when false, `stopReason` is `files`, `bytes`, `time`, `provider`, or `results`. Partial results are lower bounds, not proof of absence.
 
 **Response `200`:**
 
@@ -218,7 +267,8 @@ Searches the repo for a query string. Does not mutate session state — no SSE e
       "lineContent": "broadcastEvent(sessionId, event)",
       "context": []
     }
-  ]
+  ],
+  "complete": true
 }
 ```
 
@@ -264,7 +314,7 @@ Records an architectural decision. Appends to `session.decisions` and broadcasts
 
 ### `POST /api/tools/flag-question`
 
-Records an open question that needs resolving before the build can proceed. Appends to `session.openQuestions` and broadcasts `session_updated`.
+Records a question requiring resolution before Build. Appends to `session.openQuestions` and broadcasts `session_updated`.
 
 **Request body:**
 
@@ -300,7 +350,7 @@ Records an open question that needs resolving before the build can proceed. Appe
 
 ### `POST /api/tools/generate-spec`
 
-Generates the PR spec from all accumulated decisions and file reads. Sets `session.specOutput` and `session.status = 'complete'`. Broadcasts `session_updated`.
+Generates the PR spec from all decisions and file reads. Sets `session.specOutput` and `session.status = 'complete'`. Broadcasts `session_updated`.
 
 **Request body:**
 
@@ -327,9 +377,9 @@ Generates the PR spec from all accumulated decisions and file reads. Sets `sessi
 
 ### `POST /api/agent/post-call`
 
-Called by ElevenLabs at the end of every conversation. Not called from the browser.
+ElevenLabs calls this after every conversation. Not called from the browser.
 
-**Important:** This route returns `200` for all business-logic failures (missing `session_id`, unknown session, schema mismatch). ElevenLabs retries any non-200 response and will flood the server. Only `401` (invalid signature) and `400` (unparseable JSON) return non-200.
+**Response policy:** Validly signed but irrelevant deliveries (unknown Session/call or unsupported payload shape) return `200` with an ignored reason. Invalid signatures return `401`, unparseable JSON returns `400`, and missing HMAC configuration or unavailable durable storage returns `503` so retryable failures are not acknowledged as stored.
 
 **Request body** (subset — full payload has additional fields):
 
@@ -337,24 +387,26 @@ Called by ElevenLabs at the end of every conversation. Not called from the brows
 {
   "type": "post_call_transcription",
   "data": {
+    "conversation_id": "<provider conversation ID>",
     "metadata": {
       "call_duration_secs": 183
     },
     "transcript": [{ "role": "user", "message": "Let's add a caching layer", "time_in_call_secs": 12 }],
     "conversation_initiation_client_data": {
       "dynamic_variables": {
-        "session_id": "sess_abc123"
+        "session_id": "sess_abc123",
+        "call_id": "<call UUID>"
       }
     }
   }
 }
 ```
 
-Session reads, SSE, and build requests require the `capability` returned by session creation. Use `Authorization: Bearer <capability>`; SSE uses `?capability=<capability>`. Agent tool requests include the same value as `session_token` beside `session_id`.
+Session routes use operator cookies. Only agent tool requests use the call-bound `session_token`. Signed callbacks use their own HMAC authentication; capability expiry does not reject a legitimate post-call delivery.
 
-**Signature verification:** When `ELEVENLABS_WEBHOOK_SECRET` is set, the route verifies the `ElevenLabs-Signature` header using `elevenlabs.webhooks.constructEvent()`. Returns `401` on failure.
+**Signature verification:** When `ELEVENLABS_WEBHOOK_SECRET` is set, the route verifies the `ElevenLabs-Signature` header using `elevenlabs.webhooks.constructEvent()`. Returns `401` on failure. Every non-test runtime refuses this path without the secret.
 
-**On success** — updates the session in a single `updateSession` call (one broadcast):
+**On success** — records a durable Webhook receipt and queues finalization. In memory mode the same mutation runs inline for tests and local UI work; the Compose Worker applies it from PostgreSQL:
 
 ```json
 {
@@ -365,7 +417,7 @@ Session reads, SSE, and build requests require the `capability` returned by sess
 }
 ```
 
-Then emits a dedicated `call_ended` SSE event. The `session_updated` event arrives first because the session mutation broadcasts before the signal.
+The Worker atomically commits Call/Session changes, receipt/job completion and a dedicated `call_ended` event. Lease checks fence stale workers. A callback for an older call is retained without replacing a newer call’s Session state; failed/complete calls cannot finalize again. Replayed deliveries return `200` with `duplicate: true` and do not add a second job. The primary receipt identity is the provider delivery ID; when absent, the route uses provider, event type, conversation ID, event timestamp, and a SHA-256 body hash.
 
 **Response `200`:**
 
@@ -387,11 +439,11 @@ Then emits a dedicated `call_ended` SSE event. The `session_updated` event arriv
 
 All events arrive on `GET /api/sessions/:id/events` as `data: <JSON>\n\n` messages.
 
-The TypeScript union for all events is `SessionEvent` in [src/lib/session/types.ts](../src/lib/session/types.ts).
+Event union: `SessionEvent` in [src/lib/session/types.ts](../src/lib/session/types.ts).
 
 ### `session_updated`
 
-Fires after any session mutation. Carries the full session object — no diffing required on the client.
+Fires after any Session mutation. Carries the full Session; no client diffing needed.
 
 ```json
 {
@@ -408,7 +460,7 @@ Also fires on SSE connection open (current state snapshot).
 
 ### `call_ended`
 
-Fires after the post-call webhook processes a session. A dedicated signal so dashboard consumers know the call finished without having to diff `session.status`.
+Fires after post-call Session processing. Signals call completion without requiring dashboard consumers to diff `session.status`.
 
 ```json
 {
@@ -418,7 +470,7 @@ Fires after the post-call webhook processes a session. A dedicated signal so das
 }
 ```
 
-`session_updated` fires immediately before it with the fully updated session state.
+`session_updated` fires immediately before it with updated Session state.
 
 ---
 
@@ -502,7 +554,7 @@ Fires when the complexity gate rejects the build. `buildStatus` resets to `'read
 
 ## Types
 
-The canonical type definitions are in [src/lib/session/types.ts](../src/lib/session/types.ts). Never redeclare these locally.
+Canonical types: [src/lib/session/types.ts](../src/lib/session/types.ts). Never redeclare these locally.
 
 ```typescript
 type SessionStatus = 'active' | 'complete' | 'error'
@@ -510,4 +562,4 @@ type BuildStatus = 'idle' | 'ready' | 'building' | 'complete' | 'failed'
 type BuildPhase = 'analyzing' | 'writing' | 'reviewing' | 'cloning' | 'pr'
 ```
 
-> `'error'` is not a valid `BuildStatus`. Use `'failed'`. This is a common mistake — see [DX Audit](./DX-AUDIT.md).
+> `'error'` is not a valid `BuildStatus`. Use `'failed'`. See [DX Audit](./DX-AUDIT.md).

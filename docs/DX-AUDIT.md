@@ -1,6 +1,6 @@
 # DX Audit
 
-Where SpecVoice's developer experience is rough, what caused it, and what to do differently. Based on the first development cycle.
+Historical findings from the first development cycle. Current operation lives in the [documentation map](./README.md); resolved items below retain their rationale.
 
 The ElevenLabs-specific findings are in [elevenlabs-sdk-holes.md](./elevenlabs-sdk-holes.md), nine undocumented SDK behaviors found through trial and error. This document covers setup and integration friction.
 
@@ -19,23 +19,19 @@ Getting webhooks working locally requires a tunnel, and ElevenLabs bakes your tu
 
 That's four steps for a transient infra event. The post-call webhook is the most important path in the system and it's the one most likely to silently break after a restart.
 
-**What we'd change:** Automate step 3 via the ElevenLabs API (webhook update is supported) so `setup-agent.ts` handles all three ElevenLabs-side updates in one command. Until then, step 3 is documented prominently in the [README Troubleshooting section](../README.md#troubleshooting).
+**What we'd change:** Automate step 3 via the ElevenLabs API (webhook update is supported) so `setup-agent.ts` handles all three ElevenLabs-side updates in one command. Until then, step 3 is documented prominently in the [manual acceptance runbook](testing/manual-smoke.md).
 
 ---
 
-### Two agent IDs in `.env.local`
+### Two agent IDs — resolved
 
-`ELEVENLABS_AGENT_ID` and `NEXT_PUBLIC_ELEVENLABS_AGENT_ID` hold the same value. One is read server-side (by `setup-agent.ts` and the post-call route), the other is exposed to the browser for the `useConversation` hook. Next.js's `NEXT_PUBLIC_` prefix is required for browser access — there's no way around this with the App Router.
-
-It's a confusing duplicate. The README calls it out so developers don't wonder why there are two.
+The browser now receives a private signed URL from the authenticated call route. Only server-side `ELEVENLABS_AGENT_ID` remains; no public agent ID is needed. See [private call authentication](api-reference.md#post-apisessionsidcall).
 
 ---
 
-### Signature verification is conditional
+### Signature verification — resolved
 
-`ELEVENLABS_WEBHOOK_SECRET` is optional — the server runs without it and silently skips signature verification. This makes local development easier (no HMAC setup) but means it's easy to ship to production without it.
-
-**Recommendation:** Make verification non-optional in production. Add a check in the post-call route that returns 500 during startup if `NODE_ENV === 'production'` and the secret is missing.
+Production now returns `503` for post-call requests when the HMAC secret is missing, and `401` for an invalid signature. Only isolated tests may omit the secret. `.env.local.example` includes the variable; isolated E2E always signs fixtures.
 
 ---
 
@@ -55,7 +51,7 @@ The REST API reference uses `snake_case` throughout. The JS SDK uses `camelCase`
 
 ### Dashboard breaks silently when a mutation doesn't broadcast
 
-Every `sessionStore.updateSession()` call broadcasts `session_updated`. Keep new state mutations on that path. Direct `broadcastEvent()` calls are for signal events such as `call_ended` and build progress.
+Use the Session repository interface for mutations. PostgreSQL commits Session state and events together. Post-call receipt completion shares that transaction, so rollback does not leave a finalized receipt without its events.
 
 ---
 
@@ -89,10 +85,10 @@ The E2E smoke test fires `flag_question` in step 3 to verify open questions work
 
 ## What went well
 
-**SSE over WebSockets.** The decision to use Server-Sent Events is correct for this stack. Next.js App Router doesn't support WebSocket upgrade, and SSE + `ReadableStream` + `TransformStream` works within that constraint. Dashboard updates are live, the implementation is ~40 lines, and it has no external dependency.
+**SSE over WebSockets.** The decision to use Server-Sent Events is correct for this stack. Next.js App Router doesn't support WebSocket upgrade, and SSE + `ReadableStream` + `TransformStream` works within that constraint. Dashboard updates are live, replay and backpressure are covered by interface tests.
 
 **Standalone tool entities.** ElevenLabs tools are separate API resources from agents — they're created independently, then referenced by ID in the agent config. This was initially confusing (the REST API reference implies inline tool definitions) but ends up cleaner: tools can be updated without touching the agent config, and `setup-agent.ts` handles idempotent upserts separately for tools and the agent.
 
-**`globalThis` for singletons.** Using `globalThis` for the `SessionStore` and `CodeSource` cache (rather than module-level variables) survives Next.js hot reloads. The pattern is documented in `CLAUDE.md` and should be followed for any future process-level singleton.
+**`globalThis` for singletons.** Using `globalThis` for the memory adapters, test source registry, and runtime PostgreSQL pool (rather than module-level variables) survives Next.js hot reloads. The pattern is documented in `CLAUDE.md` and should be followed for any future process-level singleton.
 
 **`elevenlabs-sdk-holes.md`.** Maintaining a running log of undocumented SDK behaviors during development paid off: it became the reference that lets Claude Code work on this codebase without repeating mistakes. It's also publishable content: every item is a documentation gap that affects any developer building on ElevenLabs Conversational AI.

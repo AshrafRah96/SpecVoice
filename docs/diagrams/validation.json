@@ -1,0 +1,29 @@
+{
+  "diagramType": "architecture",
+  "archifyVersion": "3.0.1",
+  "repositoryRevision": "3cffa004a37e53e5f3deff192e60e709131c0740",
+  "specificationSha256": "099e3e5581aea269104169a558204000888d2d965cca0b2533b234e210918388",
+  "artifactSha256": "7009f69db4d4b56f5645b85690a6875a69057fac4d5a3f49fce5f90f387d1ccd",
+  "svgSha256": "8036eb78f875dc005150fafa51d2c652f67647345999e72e7782a05d22e4412b",
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "errors": 0,
+  "warnings": 0,
+  "browserEvidence": "passed",
+  "visualReview": "passed",
+  "visualReviewScope": [
+    "2048x1320 light",
+    "1440x900 dark",
+    "1052px-wide canonical SVG embedded as an image"
+  ],
+  "notes": [
+    "HTML copied byte-for-byte from the finalized artifact.",
+    "SVG exported through the Archify viewer; includes both color schemes.",
+    "Full local receipts and captures remain in .archify/architecture-specvoice-20261013-172739"
+  ],
+  "showcaseChecksPassed": 9
+}

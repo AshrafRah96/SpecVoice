@@ -1,19 +1,22 @@
 # Contributing
 
-Read `AGENTS.md` before changing the repository. It is the canonical workflow for humans and coding agents.
+Read `AGENTS.md` before editing: shared workflow for humans and agents.
 
 ## Local workflow
 
 ```bash
 npm ci
 npm run verify
+npm run test:e2e:install
 npm run test:e2e
 ```
 
-Run the browser suite when changing the dashboard, route handlers, or SSE behavior. Use the focused Vitest command for a smaller iteration, then rerun `npm run verify` before opening a pull request.
+Run browser tests for dashboard, route or SSE changes. Iterate with focused Vitest checks; run `npm run verify` before opening a PR.
+
+Run `npm run eval:offline` for tool/scope/Build gates. Durable changes: `npm run test:integration`, disposable `TEST_DATABASE_URL` ending in `_test`. Execution/deployment changes: Docker checks in [Evaluation](docs/evaluation.md). Live checks consume quota; keep separate and warning-only.
 
 ## Pull requests
 
-Describe the behavior change, the affected boundary, and the checks you ran. Keep unrelated formatting or dependency changes out of the PR. Include screenshots for meaningful UI changes and call out any external service, secret, or migration requirement.
+Describe behavior, affected boundary and checks. Exclude unrelated formatting/dependencies. Include screenshots for meaningful UI changes. Name external-service, secret and migration requirements.
 
-PRs are reviewed as draft or ready-for-review changes; generated build PRs remain drafts until a human has checked the implementation and evidence.
+PRs may be draft or ready for review. Generated Build PRs stay draft until human review of implementation and evidence.

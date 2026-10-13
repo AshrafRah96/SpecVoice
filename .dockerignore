@@ -7,3 +7,6 @@ test-results
 
 .next-e2e/
 artifacts/
+
+.archify/
+docs/diagrams/

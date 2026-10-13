@@ -1,8 +1,8 @@
 # Architecture
 
-How SpecVoice is structured and why.
+Structure and rationale.
 
-For the what (file tree, stack, commands) see the [README](../README.md). This document covers the non-obvious decisions.
+File tree, stack, commands: [README](../README.md). Non-obvious decisions follow.
 
 ---
 
@@ -24,94 +24,86 @@ ElevenLabs Agent (Claude LLM + voice)
         save-decision, flag-question, generate-spec)
 
 ElevenLabs platform (after the call)
-  └─ POST /api/agent/post-call   → transitions session to buildStatus: 'ready'
+  └─ POST /api/agent/post-call   → durable Webhook receipt → worker finalization
 
 Browser tab (user clicks "Build It")
-  └─ POST /api/sessions/:id/build → 202, build runs in background, streams via SSE
+  └─ POST /api/sessions/:id/build → durable Build Attempt → worker, streams via SSE
 ```
 
-Every tool webhook mutates the session via `SessionStore`, which broadcasts `session_updated` over SSE. The dashboard receives the update and re-renders — no polling, no page reload.
+Mutation tools use the configured Session repository; list/search stay read-only. PostgreSQL commits Session state and ordered events in one transaction. `LISTEN/NOTIFY` only wakes SSE readers; `Last-Event-ID` enables dashboard replay.
 
 ---
 
 ## Why SSE, not WebSockets
 
-Next.js App Router (the version SpecVoice uses) does not support WebSocket upgrade on API routes. The underlying HTTP server that Next.js App Router runs on doesn't expose the raw socket in a way that's compatible with the `ws` upgrade handshake.
+This Next.js App Router version cannot upgrade API routes to WebSockets. Its HTTP server exposes no raw socket compatible with the `ws` upgrade handshake.
 
-SSE over `ReadableStream` + `TransformStream` works natively within App Router constraints. The implementation is ~40 lines ([src/app/api/sessions/[id]/events/route.ts](../src/app/api/sessions/%5Bid%5D/events/route.ts)) with no external dependency. Since the dashboard only needs server-to-client push (the browser is the only one sending user intent — start call, trigger build — via normal POSTs), SSE is sufficient.
+SSE over `ReadableStream` + `TransformStream` works natively in App Router without external dependencies. [src/app/api/sessions/[id]/events/route.ts](../src/app/api/sessions/%5Bid%5D/events/route.ts) drains durable replay pages, awaits writes for backpressure, and polls missed notifications. Browsers send user intent—start call, trigger build—through normal POSTs. SSE covers the remaining server-to-client push.
 
-**Constraint to remember:** SSE is unidirectional. The browser cannot push back over the event stream. All browser-initiated actions go through separate `POST` requests.
+**Constraint to remember:** SSE is unidirectional. Browsers cannot write to the stream; all browser actions use separate `POST` requests.
 
 ---
 
 ## Why `globalThis` for singletons
 
-Two singletons need to survive across the full process lifetime:
+The shared singleton helper preserves process-level adapters across hot reloads:
 
-- `SessionStore` — holds all session state in memory
-- `CodeSource` cache — caches `GitHub`/`Local` code source instances per session
+- `SessionStore` — synchronous in-memory adapter for tests and deliberate development mode
+- Test `CodeSource` registry — explicit in-memory overrides, not a repository-content cache
+- The runtime PostgreSQL pool — shared by web repositories and queues
 
-Next.js hot-reloads module files during development. If these were module-level variables, every hot reload would reset the store and lose all session state. `globalThis` persists across module re-evaluations within the same Node.js process.
+Next.js development hot reloads would reset module-level stores and lose Session state. `globalThis` survives module re-evaluation within the same Node.js process.
 
-Both singletons follow this pattern:
-
-```typescript
-// Attach to globalThis once, reuse the existing instance on hot reload
-const g = globalThis as typeof globalThis & { _sessionStore?: SessionStore }
-if (!g._sessionStore) g._sessionStore = new SessionStore()
-export const sessionStore = g._sessionStore
-```
-
-Any future process-level singleton (connection pools, file system caches, etc.) should follow the same pattern.
+`src/lib/singleton.ts` and `src/lib/db/postgres.ts` centralize this pattern. Separate worker processes own and close their pools.
 
 ---
 
 ## Why no RAG, no embeddings, no vector database
 
-The usual approach for "AI that understands a codebase" is: chunk the code, embed it, store it in a vector DB, retrieve relevant chunks at query time.
+Typical codebase AI chunks code, embeds it in a vector DB, then retrieves relevant chunks at query time.
 
-SpecVoice doesn't do this. The agent tools give Claude file access on demand — it calls `list_files` to orient, then `read_file` to read exactly what it needs, `search_code` to find usages. Claude 3.5/4 has enough context window and reasoning capability to navigate a codebase this way without pre-indexing.
+SpecVoice instead gives Claude on-demand tools: `list_files` for orientation, `read_file` for needed content, `search_code` for usages. Discovery stays explicit and inspectable; profiling supplies bounded size metadata without embeddings.
 
 Benefits:
 
-- No indexing step, no vector DB to manage, no embedding costs
-- Agent reads what's actually relevant to the current question, not what a similarity search thinks is relevant
-- The audit trail (files read, decisions logged) is a first-class feature, not a side effect
+- No semantic indexing, vector DB, or embedding costs
+- Agent selects files relevant to the current question; similarity search does not choose them
+- Audit trail—files read, decisions logged—is a first-class feature
 
-Constraint: File reads are capped at 4000 characters. The agent must navigate deliberately — it can't dump an entire large file into context. This is intentional: it forces the spec to stay grounded in what the agent actually looked at, which is recorded in `session.filesRead`.
+Constraint: file reads cap at 4000 characters; entire large files cannot enter context at once. Deliberate navigation grounds the Spec in inspected content, recorded in `session.filesRead`.
 
 ---
 
 ## Why ElevenLabs tools are standalone entities
 
-The ElevenLabs API distinguishes between:
+ElevenLabs separates:
 
 - **Tools** — standalone API resources, created via `client.conversationalAi.tools.create()`
 - **Agent config** — references tools by their IDs in `prompt.toolIds`
 
-This is unintuitive when you first read the docs (the REST API reference implies inline tool definitions). In practice it's cleaner:
+The REST API reference implies inline definitions. Separate resources provide cleaner ownership:
 
 - Tools can be updated independently of the agent config
-- `setup-agent.ts` does an idempotent upsert: creates tools if they don't exist, updates them if they do, then updates the agent with the full `toolIds` list
-- `toolIds` is always a complete replacement, not a merge — passing a partial list silently removes the omitted tools
+- `setup-agent.ts` idempotently creates missing tools, updates existing tools, then updates the agent with the full `toolIds` list
+- `toolIds` replaces the entire list; partial lists silently remove omitted tools, never merge
 
-Tool routing uses a single dynamic route — `src/app/api/tools/[name]/route.ts` — that reads the `name` path segment and calls `toolRegistry.dispatch(name, req)`. The registry is defined in `src/lib/api/tool-registry.ts`, which registers one handler per tool name and delegates shared session-lookup and Zod validation to `src/lib/api/tool-handler.ts`.
+One dynamic route, `src/app/api/tools/[name]/route.ts`, reads `name` and calls `toolRegistry.dispatch(name, req)`. `src/lib/api/tool-registry.ts` registers one handler per tool name. Shared Session lookup and Zod validation live in `src/lib/api/tool-handler.ts`.
 
 Three distinct responsibilities:
 
 - **ElevenLabs tool config** (webhook URL, description, parameter schema as sent to ElevenLabs): `src/lib/agent/tool-definitions.ts`
 - **Server handler logic** (session lookup, validation, side effects): `src/lib/api/tool-registry.ts`
-- **Route dispatch** (thin adapter — reads `name`, calls registry): `src/app/api/tools/[name]/route.ts`
+- **Route dispatch** (thin adapter reading `name`, calling registry): `src/app/api/tools/[name]/route.ts`
 
-Never put handler logic in the route file, and never put ElevenLabs schema config in the registry.
+Never put handler logic in routes or ElevenLabs schema config in the registry.
 
 ---
 
 ## How session capabilities travel from browser to tool webhook
 
-When a session is created, the server returns a short-lived capability alongside the session. When a call starts, the browser calls `conversation.startSession()` with `dynamicVariables: { session_id: session.id, session_token: capability }`. ElevenLabs stores both as conversation variables.
+A revocable operator cookie protects saved Session history and dashboard routes. Call start requests a private ElevenLabs signed URL and issues a fresh capability bound to the Session and Voice call. The browser passes `dynamicVariables: { session_id: session.id, session_token: capability, call_id: callId }`. ElevenLabs retains these variables for tools and signed completion callbacks.
 
-Each tool definition wires both values with `dynamicVariable` fields in its parameter schema:
+Tool parameter schemas wire both values through `dynamicVariable` fields:
 
 ```typescript
 const SESSION_ID_PROP = {
@@ -125,47 +117,72 @@ const SESSION_TOKEN_PROP = {
 }
 ```
 
-At call time, ElevenLabs injects both values into every outbound webhook request body automatically. The tool handler verifies the capability before looking up the session. The capability never enters the `Session` object or the generated spec.
+During calls, ElevenLabs injects both values into every outbound webhook body. Handlers verify the capability before Session lookup. Capabilities never enter the `Session` object or generated Spec.
 
-This `dynamicVariable` field is an ElevenLabs extension to JSON Schema and is not documented in the server tools guide. See [elevenlabs-sdk-holes.md §9](./elevenlabs-sdk-holes.md) for the discovery.
+`dynamicVariable` extends JSON Schema; ElevenLabs' server tools guide omits it. Discovery: [elevenlabs-sdk-holes.md §9](./elevenlabs-sdk-holes.md).
 
 ---
 
 ## How the dashboard stays in sync
 
-The `useSession` hook in [src/components/hooks/useSession.ts](../src/components/hooks/useSession.ts) is the single source of truth for dashboard state. It:
+`useSession` in [src/components/hooks/useSession.ts](../src/components/hooks/useSession.ts) owns dashboard state:
 
 1. Opens an `EventSource` to `/api/sessions/:id/events`
-2. Receives `session_updated` events and replaces the full session object in React state (no diffing)
-3. Maintains a separate `buildLog` array (populated by `build_progress` events — these don't appear on the `Session` object)
-4. Reconnects with exponential backoff on disconnect
+2. Replaces the full Session object in React state on `session_updated` (no diffing)
+3. Keeps `build_progress` entries in a separate `buildLog` array, outside the `Session` object
+4. Keeps native EventSource reconnect behavior and its Last-Event-ID cursor
 5. Cleans up the `EventSource` on unmount
 
-The critical rule: **`session_updated` carries all state**. Events like `call_ended`, `build_complete`, and `build_failed` are signals, not the authoritative state. The dashboard renders the latest session object and does not derive state from signal events.
+**`session_updated` carries all state**. `call_ended`, `build_complete`, and `build_failed` are signals, not authoritative state. Render the latest Session object; never derive state from signals.
 
 ---
 
 ## Code source abstraction
 
-Two implementations of `CodeSource`:
+Production `CodeSource` implementations, plus an in-memory fixture adapter:
 
 - `GitHubCodeSource` — reads via Octokit; requires `GITHUB_TOKEN` for private repos
-- `LocalCodeSource` — reads from `repoLocalPath` via the Node.js `fs` module. Public session creation accepts local paths only below `SPECVOICE_LOCAL_REPO_ROOT`; traversal and symlink escapes are rejected.
+- `LocalCodeSource` — reads committed Git objects under `repoLocalPath`; excludes dirty and untracked files. Public Session creation accepts paths only below `SPECVOICE_LOCAL_REPO_ROOT`; rejects traversal and symlink escapes.
 
-Both are resolved from session state via `resolveCodeSource(session)` in [src/lib/code/index.ts](../src/lib/code/index.ts). Route handlers never instantiate a code source directly.
+`resolveCodeSource(session)` in [src/lib/code/index.ts](../src/lib/code/index.ts) selects from Session state. Route handlers never instantiate sources directly.
 
-All file listing applies `.gitignore` rules via the `ignore` npm package ([src/lib/code/ignore-rules.ts](../src/lib/code/ignore-rules.ts)). Never skip this filter or write custom glob matching.
+Both adapters pin commits at Session creation. Missing commits fail; never silently repin. GitHub reads use that SHA. Confirmed Scope Plans wrap code tools, confining discovery to approved roots. Repository operations enforce scope and budgets. Builds sparsely check out the same SHA and validate every new commit's changed paths before publication. See [Repository scale](./repository-scale.md).
+
+Local discovery reads pinned `.gitignore` rules. Both adapters apply default rules through npm `ignore` ([src/lib/code/ignore-rules.ts](../src/lib/code/ignore-rules.ts)). Never skip this filter or write custom glob matching.
 
 ---
 
 ## Build pipeline placement
 
-The build pipeline runs strictly post-call. It is never triggered during a voice conversation. The timing constraint exists because:
+Builds run strictly post-call, never during voice conversations:
 
-1. The spec (`session.specOutput`) is only generated by `generate_spec`, which the agent calls at the end of the conversation
-2. Running a multi-turn Claude Code CLI process during an active voice call would add unpredictable latency to webhook responses
-3. The complexity gate (which reads `session.filesRead` and `session.openQuestions`) needs the complete call state
+1. Only `generate_spec` produces `session.specOutput`; the agent calls it at conversation end
+2. Multi-turn Claude Code CLI execution during a call would add unpredictable webhook latency
+3. The complexity gate reads `session.filesRead` and `session.openQuestions`; it needs complete call state
 
-See [build-pipeline.md](./build-pipeline.md) for the current implementation and phase sequence.
+Implementation and phases: [build-pipeline.md](./build-pipeline.md).
 
-Session routes require the short-lived capability returned by `POST /api/sessions`. The capability is passed in an `Authorization: Bearer` header for browser requests, as an SSE query parameter where `EventSource` cannot set headers, and as `session_token` in agent tool payloads. The in-memory session store is explicitly single-process; production traffic is rejected unless `SPECVOICE_ALLOW_IN_MEMORY_SESSIONS=true` is set.
+Session routes use operator cookies; tool webhooks use call capabilities. Production requires PostgreSQL. Memory mode serves tests and UI/discovery development; default Builds require the durable isolated runtime.
+
+## Execution and recovery seams
+
+The trusted Worker runs independent Build, profile, receipt and maintenance lanes. PostgreSQL owns claims, renewed leases and ordered events. Post-call finalization commits Call, Session, receipt and events together. The Build Attempt interface owns publication reconciliation; unknown generation never replays automatically.
+
+```mermaid
+flowchart LR
+  Browser[Private dashboard] --> Web[Web / operator cookie]
+  Provider[ElevenLabs] --> Ingress[Provider-only ingress]
+  Ingress --> Web
+  Web --> DB[(PostgreSQL)]
+  Worker[Trusted Worker] --> DB
+  Worker --> Launcher[Restricted launcher / Docker socket]
+  Launcher --> Execution[Disposable execution]
+  Execution --> Gateway[Model gateway / real API key]
+  Gateway --> DB
+  Execution --> Proxy[Allowlist proxy]
+  Worker --> GitHub[Push validated commit / draft PR]
+```
+
+Execution receives regular scoped source files and returns a bounded patch. The Worker applies it in its fresh Git checkout and validates paths before publication. Only the launcher holds the Docker socket; only the gateway holds the real model key. Fixed-image/container limits and attempt credentials constrain hostile code; Docker still shares the host kernel. See [execution details](agents/claude-code.md).
+
+Session transactions apply retention while preserving immutable planning records. Encrypted backups stream to a second disk/NAS. Restore applies retention and revokes restored logins before startup. Restored queued attempts count as uncertain generation: they may have run since backup. See [restore policy](backups.md).

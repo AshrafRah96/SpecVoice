@@ -1,168 +1,67 @@
-# Build Pipeline
+# Build pipeline
 
-The post-call build pipeline takes a completed PR spec and turns it into a draft pull request. This document covers the implementation, the complexity gate that guards it, and the SSE event sequence the dashboard consumes.
+A Build turns a Session's Spec into a draft PR for human review. Voice tools gather evidence and produce the Spec; explicit Builds run Claude Code. This reference owns execution and recovery. Command, process limits, credentials: [Claude Code integration](agents/claude-code.md).
 
-The build route requires the session capability and an `Idempotency-Key`. `SessionStore.tryStartBuild()` atomically accepts the first key, replays the same key, and rejects a competing key while a build is running. This prevents double branch pushes and duplicate draft pull requests within the single-process deployment boundary.
+## Accepting a Build
 
----
+`POST /api/sessions/{id}/build` requires an operator cookie, Spec, and Repository Profile matching the Session's pinned Repository Snapshot. Profile status must be `ready` or `partial`. Mid, large, very-large, and incomplete profiles require confirmed scope. Every existing Scope Plan must be confirmed and match the pinned commit, even for small repositories.
 
-## Implementation
+Send an `Idempotency-Key`; reuse it for retries. Omission generates a fresh key. Acceptance returns `202`; the same key replays acceptance. Competing requests return `409` while an attempt is queued, running, or awaiting reconciliation. Missing Specs return `400`; unavailable or changed profile/scope readiness returns `409`.
 
-The build route at [src/app/api/sessions/[id]/build/route.ts](../src/app/api/sessions/%5Bid%5D/build/route.ts) starts `BuildPipeline.run()` from `src/lib/build/pipeline.ts` in the background.
+PostgreSQL acceptance locks Session and snapshot, rechecks readiness, and freezes repository SHA, accepted scope, Spec, decisions, transcript, and other Session evidence. Branch: `spec-voice/<session-id>/<attempt-id>`. Later Session edits cannot change accepted inputs. Regenerating a Spec during execution preserves active Build state.
 
-### Orchestration sequence
+The route only enqueues durable work; tests retain an injected fake-runner path. Default execution requires PostgreSQL and isolated Compose. Memory mode supports discovery and UI development, not host execution. Deployment: [local runtime](local-runtime.md). Requests: [API reference](api-reference.md).
 
-Validation and execution run in this order:
+## Execution sequence
 
-1. **Complexity** — `validateBuild()` assesses file count and open questions. A blocked assessment emits `build_blocked`.
-2. **Prerequisites** — `claude --version`, `ANTHROPIC_API_KEY`, and `GITHUB_TOKEN` must be available. Failures emit `build_failed`.
-3. **Repo URL** — sessions with only `repoLocalPath` fast-fail with `"Session has no repository URL."`
-4. **Clone** — `cloneRepo(session.repoUrl)` into `os.tmpdir()`; cleaned up in `finally`
-5. **Write build inputs** — `writeBuildFiles(dir, session)` writes `SPEC.md` and `CONTEXT.md` into the clone dir, and appends both to `.gitignore`
-6. **Claude Code CLI** — spawned in headless mode (see below); tool-use events map to SSE `build_progress` events
-7. **Draft PR** — `createDraftPR()` via Octokit; sets `buildStatus: 'complete'` and broadcasts `build_complete { prUrl }`
+The Worker claims a Build Attempt, then passes frozen inputs to `BuildPipeline`:
 
-This is post-call only. The pipeline is never triggered during an active voice conversation.
+1. **Validate readiness.** Require completed call, captured Spec, permitted scope, durable runtime and GitHub publication credentials. Local discovery alone cannot make a repository buildable.
+2. **Prepare pinned source.** Fetch the immutable commit into trusted temporary Git storage with partial clone and literal sparse checkout. Reject generated `SPEC.md`/`CONTEXT.md` collisions; exclusions stay in checkout-local `.git/info/exclude`.
+3. **Checkpoint generation.** Persist `generating` before any model execution. Export only scoped, regular tracked files within 64 MiB; verify bytes against Git objects.
+4. **Execute in a disposable container.** The restricted launcher fixes the image and limits resources, filesystem and network. Node/npm lockfile installation disables lifecycle scripts by default. Claude gets 80 turns and 15 minutes within a 30-minute attempt. The model gateway reserves estimated spending and checks lease ownership. An explicit npm test command must pass after generation.
+5. **Validate output in trusted Git.** Receive only a bounded patch. Terminate/remove execution and revoke its credential before applying the patch in trusted checkout. Commit locally; validate ancestry and every changed path, including deletion and rename endpoints. Repository-controlled Git metadata never enters publication.
+6. **Publish through the Worker.** Persist `push_pending` with validated SHA; recheck ownership, then push that exact SHA to the unique attempt branch. Persist `pushed`; reuse an existing PR or create a draft against the default branch. Recovery reuses these identities.
+7. **Finish atomically.** Commit terminal attempt status, Session state and events together. Await subprocess/container termination before deleting temporary files. Persistence or ownership failure cancels execution.
 
-### Claude Code invocation
+Boundaries: [Build Attempt execution](../src/lib/build/attempt.ts), [pipeline orchestration](../src/lib/build/pipeline.ts), [workflow steps](../src/lib/build/workflow-steps.ts). Generated PRs never auto-merge.
 
-```bash
-claude -p "<prompt>" \
-  --output-format stream-json \
-  --verbose \
-  --allowedTools "Read,Write,Edit,Bash(git *),Bash(npm test *),Bash(npx *)" \
-  --max-turns 300
-```
+## Recovery and ownership
 
-Spawned with `stdio: ['ignore', 'pipe', 'pipe']` — stdout piped for NDJSON parsing; stderr drained line-by-line (avoids 64KB buffer deadlock) and included in error messages on non-zero exit. Git identity injected via `GIT_AUTHOR_NAME/EMAIL` and `GIT_COMMITTER_NAME/EMAIL` env vars.
+Default lease: 15 minutes, renewed every 30 seconds. State writes require the current token and an unexpired lease. Worker shutdown or renewal failure aborts execution; Git and Claude receive the same cancellation signal. Expired attempts are reclaimed for checkpoint inspection.
 
-The prompt instructs Claude Code to: read `SPEC.md` and `CONTEXT.md`, checkout a new branch, implement changes, run tests, fix failures, commit, and push. The PR is opened by `createDraftPR()` after the process runner resolves — not by Claude Code itself.
+| Checkpoint     | Recovery behavior                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| `queued`       | Preparation may restart; generation has not been checkpointed.                            |
+| `generating`   | Fail with an explicit new-Build requirement. Never automatically repeat model generation. |
+| `push_pending` | Compare the remote branch with the recorded generated SHA before recovering PR creation.  |
+| `pushed`       | Verify the same remote SHA, then reuse or create the branch's draft PR.                   |
 
-### Branch naming
+A missing published branch requires a new explicit Build; a different remote SHA requires human review. Legacy attempts lacking immutable inputs and branch identity fail, never regenerate. Temporary checkouts are not durable recovery artifacts. Older backups may contain queued attempts already generated since backup. Without publication checkpoints, those restored attempts require explicit new work.
 
-`spec-voice/<slugified-first-decision-summary>` or `spec-voice/<session-id[:8]>` if no decisions.
+Transient publication failures preserve branch, inputs, and generated SHA. Reconciliation gets five attempts with exponential delays capped at 60 seconds; the initial publication failure consumes none. Exhaustion sets `buildStatus: 'failed'` and exposes `buildRecovery` with attempt ID and retryability. Pending recovery keeps the Session `building`.
 
-### Phase mapping
-
-Each `tool_use` block in the NDJSON output emits a `build_progress` SSE event. Phase derived by `phaseFromTool(name)`:
-
-| Tools                                  | Phase         |
-| -------------------------------------- | ------------- |
-| `Read, Glob, Grep`                     | `'analyzing'` |
-| `Write, Edit, MultiEdit, NotebookEdit` | `'writing'`   |
-| everything else                        | `'reviewing'` |
-
-Cloning and PR creation emit `'cloning'` and `'pr'` directly.
-
----
+Retry publication without generation: send `POST /api/sessions/{id}/build` with operator cookie, `Content-Type: application/json`, and `{"retryAttemptId":"<attempt-id>"}`. Eligible failed publication attempts reset recovery, preserving identity and inputs. Acceptance returns `202 { accepted: true, recoveryOnly: true }`; ineligible or conflicting attempts return `409`. Normal Build requests create new attempts and can consume model quota.
 
 ## Complexity gate
 
-Before execution starts, `validateBuild()` calls `assessComplexity(session)`. This runs synchronously and may block the build before a single line of code is generated.
+The gate conservatively estimates from discovery evidence, independently of Repository Profile size and Scope Plan inventory. Default estimated lines: `session.filesRead.length * 50`. It never parses the Spec to infer change size.
 
-### Gate logic
+| Size        | Estimated lines | Files read |
+| ----------- | --------------- | ---------- |
+| `small`     | < 500           | < 10       |
+| `medium`    | < 2,000         | < 40       |
+| `large`     | < 5,000         | < 100      |
+| `too_large` | ≥ 5,000         | ≥ 100      |
 
-```typescript
-fileCount = session.filesRead.length // files the agent read during the call
-lineEstimate = fileCount * 50
-```
+Unresolved questions or `too_large` estimates block generation; open questions take precedence in `blockReason`. Blocked Builds return to `ready` because the Spec remains. Oversized estimates group available decision `relevantFiles` by first path segment into `splitSuggestion`, suggesting smaller proposals. Suggestions never replace confirmed scope or publication validation.
 
-| `size`      | `lineEstimate` | ~files read |
-| ----------- | -------------- | ----------- |
-| `small`     | < 500          | < 10        |
-| `medium`    | < 2000         | < 40        |
-| `large`     | < 5000         | < 100       |
-| `too_large` | ≥ 5000         | ≥ 100       |
+Assessment: [complexity.ts](../src/lib/session/complexity.ts). Shared event and assessment types: [Session types](../src/lib/session/types.ts).
 
-**Blocked when** either condition is true:
+## Dashboard events
 
-- `size === 'too_large'`
-- `session.openQuestions.length > 0`
+Acceptance emits `build_started`; execution emits `build_progress` for cloning, fixed activities, and PR creation. Persist progress in order before consuming further runner output. The parser maps reading to `analyzing`, editing to `writing`, other activity to `reviewing`. The trusted runner stores fixed labels and sanitized errors, never arbitrary model commands or transcript fragments.
 
-When blocked, `buildStatus` resets to `'ready'` (not `'idle'` — the spec still exists). The `build_blocked` SSE event carries the full `ComplexityAssessment`.
+Terminal paths emit `build_complete`, `build_failed`, or `build_blocked` alongside corresponding `session_updated` state. Recovery updates `buildRecovery` through Session events; it never starts another generation stream. Render status and PR links from Session state, not signal events alone.
 
-### `splitSuggestion`
-
-Only populated when `blockReason === 'too_large'`. Groups decision `relevantFiles` by their first path segment. The gate's `fileCount` still comes from `session.filesRead.length`.
-
-```typescript
-splitSuggestion = groupByTopLevelDir(session.decisions.flatMap(d => d.relevantFiles))
-```
-
-This gives the developer a suggested way to split the spec into smaller, independently buildable pieces.
-
-### `ComplexityAssessment` shape
-
-Defined in [src/lib/session/types.ts](../src/lib/session/types.ts):
-
-```typescript
-interface ComplexityAssessment {
-  fileCount: number
-  openQuestionCount: number
-  lineEstimate: number
-  size: 'small' | 'medium' | 'large' | 'too_large'
-  blocked: boolean
-  blockReason?: 'too_large' | 'open_questions'
-  splitSuggestion?: string[][] // files grouped by top-level directory
-}
-```
-
----
-
-## Route guards
-
-Enforced in order before any build work:
-
-| Check                                | Response                                        |
-| ------------------------------------ | ----------------------------------------------- |
-| `session.buildStatus === 'building'` | `409 { error: "Build already in progress..." }` |
-| `!session.specOutput`                | `400 { error: "No spec to build from." }`       |
-
-`buildStatus` is set to `'building'` synchronously — before the 202 is returned. This ensures the 409 guard works correctly if a second request arrives before the async build resolves.
-
----
-
-## SSE event sequence
-
-A successful unblocked build:
-
-```
-build_started
-build_progress { phase: 'analyzing', detail: '...' }
-build_progress { phase: 'writing',   detail: '...' }
-build_progress { phase: 'reviewing', detail: '...' }
-build_progress { phase: 'cloning',   detail: '...' }
-build_progress { phase: 'pr',        detail: '...' }
-session_updated { buildStatus: 'complete', prUrl: '...' }
-build_complete  { prUrl: '...' }
-```
-
-A blocked build:
-
-```
-build_started
-session_updated { buildStatus: 'ready', complexityAssessment: {...} }
-build_blocked   { assessment: {...} }
-```
-
-A failed build:
-
-```
-build_started
-build_progress { phase: 'cloning', detail: '...' }
-session_updated { buildStatus: 'failed' }
-build_failed    { error: '...' }
-```
-
-The `session_updated` event always carries the authoritative state. `build_complete` and `build_failed` are signals; the dashboard should render from `session.buildStatus` and `session.prUrl`, not from the signal events alone.
-
----
-
-## Common mistakes
-
-| Wrong                                               | Correct                                                                                                           |
-| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `setBuildStatus('error')`                           | `setBuildStatus('failed')` — `'error'` is not in `BuildStatus`                                                    |
-| `buildStatus = 'idle'` after a complexity block     | `buildStatus = 'ready'` — the spec still exists                                                                   |
-| Call the Anthropic API directly for code generation | Use `claude -p ... --output-format stream-json` CLI in headless mode — never import `anthropic` in the build path |
-| Skip the `finally` cleanup for the temp dir         | Always clean up — failed clones leave large directories in `os.tmpdir()`                                          |
+PostgreSQL events persist for replay. SSE reconnects retain their cursor, drain pages with backpressure, and combine periodic polling with notification wakeups. Session event boundary: [architecture](architecture.md).

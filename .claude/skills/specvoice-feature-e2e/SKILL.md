@@ -1,80 +1,14 @@
 ---
 name: specvoice-feature-e2e
-description: Use when writing, fixing, or extending the SpecVoice E2E test suite — manual HTTP smoke test (`docs/testing/manual-smoke.md`) or Playwright critical-path test. Also use when adding data-testid attributes, debugging SSE-driven UI assertions, or diagnosing why a Playwright assertion times out without a sleep fix.
+description: Use when writing Playwright checks, debugging SSE-driven browser assertions, or changing the manual HTTP smoke test.
 ---
 
-## Overview
+# Verify the user flow
 
-Two complementary test layers verify the full SpecVoice data path:
+1. Read `playwright.config.ts` and `tests/e2e/helpers.ts`. Playwright owns an isolated memory server on port 3117, fixed test secrets, and provider credential overrides. Reuse is disabled. Completion: tests cannot attach to a developer server or read `.env.local` secrets.
+2. Use the committed local Git fixture for Session creation. Log in with the fixed operator fixture and capture the Session ID. Fixture helpers mint synthetic provider capabilities separately; production issues them only when a private call starts. Wait for profile readiness before repository tool calls; confirm required scope before Build. Completion: the browser displays the expected profile/Build state.
+3. Send tool payloads with root `session_id` and `session_token`; use kebab-case route names. Sign post-call fixtures with the fixed test secret. Their Session ID remains nested under `data.conversation_initiation_client_data.dynamic_variables.session_id`. Completion: assert HTTP status and the resulting browser change.
+4. Assert SSE-driven UI outcomes using locators and retrying expectations. `list-files` and `search-code` are read-only; mutation tools produce Session events. Completion: no fixed sleep is needed to observe the mutation.
+5. Run `npm run test:e2e`; canonical CI retains failure artifacts. For durable changes also run `npm run test:integration` against disposable PostgreSQL ending in `_test`.
 
-- **Manual smoke test** — curl commands against `npm run dev`; verifies every HTTP endpoint and SSE event in sequence.
-- **Playwright test** (`tests/e2e/critical-path.spec.ts`) — drives a real browser; fires API calls as HTTP within the test while the browser watches for SSE-driven UI updates. Config lives at `playwright.config.ts` (project root), `testDir: './tests/e2e'`, `reuseExistingServer: true`. Commands: `npm run test:e2e`, `npm run test:e2e:ui`.
-
-## Manual smoke test steps
-
-1. `POST /api/sessions` → capture `id`. Expect `buildStatus: 'idle'`.
-2. Open SSE stream: `curl -N .../api/sessions/{id}/events` — keep running for the entire test.
-3. Fire tool webhooks in order. Each tool request includes root `session_id`; only the post-call webhook uses `data.conversation_initiation_client_data.dynamic_variables.session_id`:
-   - Agent names are `list_files`, `read_file`, `search_code`, `save_decision`, `flag_question`, and `generate_spec`.
-   - Their webhook paths and registry keys are `list-files`, `read-file`, `search-code`, `save-decision`, `flag-question`, and `generate-spec`.
-   - `list_files` / `list-files` — no SSE event (no session mutation).
-   - `read_file` / `read-file` — SSE fires `session_updated` with `filesRead` populated.
-   - `search_code` / `search-code` — no SSE event.
-   - `save_decision` / `save-decision` — SSE fires `session_updated` with `decisions` populated.
-   - `flag_question` / `flag-question` — SSE fires `session_updated` with `openQuestions` populated.
-   - `generate_spec` / `generate-spec` — SSE fires `session_updated` with `specOutput` set.
-4. `GET /api/sessions/{id}` — verify all fields populated.
-5. `POST /api/agent/post-call` with correct payload → `{"received": true}`. SSE fires `session_updated` with `buildStatus: 'ready'`, `callDurationSecs`, `transcript`, then `call_ended`.
-6. `POST /api/agent/post-call` with no `session_id` → must return `200 { ignored: '...' }` (graceful no-op, never 4xx).
-7. `POST /api/sessions/{id}/build` → 202. SSE fires `build_started` then `build_blocked` with `blockReason: 'open_questions'` (open question was flagged in step 3). `buildStatus` returns to `'ready'` — the build never started.
-8. Use a fresh session with no open questions. Send a second `POST /api/sessions/{id}/build` while the first build is still running → 409.
-
-### Correct post-call webhook payload shape
-
-```json
-{
-  "type": "post_call_transcription",
-  "data": {
-    "metadata": { "call_duration_secs": 183 },
-    "transcript": [],
-    "conversation_initiation_client_data": {
-      "dynamic_variables": { "session_id": "<id>" }
-    }
-  }
-}
-```
-
-## Playwright test
-
-Test flow: load dashboard → create session via UI → assert `sse-status` text is "connected" → fire API calls → assert UI updates without page reload.
-
-All assertions use `{ timeout: 5000 }`. Selectors use `page.locator('[data-testid="..."]')`.
-
-## data-testid requirements
-
-These attributes must exist in components or the Playwright test cannot locate elements:
-
-| Attribute       | Component                                                                      |
-| --------------- | ------------------------------------------------------------------------------ |
-| `session-id`    | SessionControls — renders session ID (only visible when `!session.specOutput`) |
-| `sse-status`    | SessionControls — SSE connection status text "connected" or "disconnected"     |
-| `file-explorer` | FileExplorer root element                                                      |
-| `spec-preview`  | SpecPreview root element                                                       |
-| `build-button`  | BuildPanel "Build it" button                                                   |
-
-## What is NOT tested
-
-- Actual voice calls (WebRTC cannot be automated meaningfully).
-- Build pipeline internals, Claude Code CLI spawn, or PR creation.
-
-## Common Mistakes
-
-1. **Adding `waitForTimeout` or `sleep` to make assertions pass.** Never do this. A timeout means the SSE broadcast is too slow or missing — fix the broadcast, not the test.
-
-2. **Wrong post-call payload shape.** The session ID lives at `data.conversation_initiation_client_data.dynamic_variables.session_id`. Duration is `data.metadata.call_duration_secs` (snake_case). Do not flatten or rename these fields.
-
-3. **Forgetting `data-testid` attributes.** Playwright selectors are `[data-testid="..."]`. If an attribute is missing from the component, the test fails with a timeout, not a useful error. Add the attribute to the component first.
-
-4. **Expecting SSE events from `list_files` or `search_code`.** These tools do not mutate session state, so they do not fire `session_updated`. Only `read_file`, `save_decision`, `flag_question`, and `generate_spec` broadcast SSE.
-
-5. **Expecting `buildStatus: 'building'` or a successful build after step 7.** The smoke test flags an open question in step 3. When `/build` is triggered, the complexity gate blocks it immediately: SSE fires `build_blocked` with `blockReason: 'open_questions'` and `buildStatus` reverts to `'ready'`. The correct post-build assertion is `build_blocked`, not a running or completed build.
+The manual operator path is `docs/testing/manual-smoke.md`; live provider calls consume quota and remain a separate check. Browser fixtures simulate signed provider callbacks, not microphone/voice quality or a live Claude/GitHub Build. Subprocess and publication behavior is covered separately in `tests/lib/build`, with recovery/receipt transactions in `tests/integration`.

@@ -1,0 +1,559 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "SpecVoice architecture",
+    "output": ".archify/architecture-specvoice-20261013-172739/specvoice.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "https://github.com/AshrafRah96/SpecVoice.git",
+      "provider": "github",
+      "revision": "3cffa004a37e53e5f3deff192e60e709131c0740"
+    }
+  },
+  "components": [
+    {
+      "id": "operator",
+      "type": "frontend",
+      "label": "Operator",
+      "sublabel": "Private browser",
+      "pos": [
+        40.0,
+        60
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "src/components/SessionControls.tsx",
+          "line": 21,
+          "end_line": 75,
+          "label": "Private call controls"
+        },
+        {
+          "path": "src/components/Dashboard.tsx",
+          "line": 1,
+          "end_line": 65,
+          "label": "Session dashboard"
+        }
+      ]
+    },
+    {
+      "id": "web",
+      "type": "backend",
+      "label": "Web application",
+      "sublabel": "Login / scoped tools / SSE",
+      "pos": [
+        350.0,
+        60
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 39,
+          "end_line": 57,
+          "label": "Private web listener"
+        },
+        {
+          "path": "src/lib/api/tool-handler.ts",
+          "line": 18,
+          "end_line": 62,
+          "label": "Call and scope enforcement"
+        },
+        {
+          "path": "src/lib/session/postgres-repository.ts",
+          "line": 32,
+          "end_line": 85,
+          "label": "Durable Session adapter"
+        }
+      ]
+    },
+    {
+      "id": "database",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Sessions / leases / events",
+      "pos": [
+        660.0,
+        60
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 23,
+          "end_line": 37,
+          "label": "Durable local database"
+        },
+        {
+          "path": "src/lib/jobs/queue.ts",
+          "line": 1,
+          "end_line": 110,
+          "label": "Build claims and checkpoints"
+        }
+      ]
+    },
+    {
+      "id": "backups",
+      "type": "backend",
+      "label": "Backup runner",
+      "sublabel": "Encrypted local destination",
+      "pos": [
+        970.0,
+        60
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "src/lib/ops/backups.ts",
+          "line": 194,
+          "end_line": 238,
+          "label": "Encrypted pg_dump backup"
+        }
+      ]
+    },
+    {
+      "id": "voice",
+      "type": "external",
+      "label": "ElevenLabs",
+      "sublabel": "Private voice conversation",
+      "pos": [
+        40.0,
+        320
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "src/components/SessionControls.tsx",
+          "line": 125,
+          "end_line": 180,
+          "label": "Signed voice connection"
+        },
+        {
+          "path": "src/app/api/sessions/[id]/call/route.ts",
+          "line": 20,
+          "end_line": 65,
+          "label": "Private call URL"
+        }
+      ]
+    },
+    {
+      "id": "ingress",
+      "type": "security",
+      "label": "Provider ingress",
+      "sublabel": "Only tool / callback POSTs",
+      "pos": [
+        350.0,
+        320
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "src/provider-ingress.ts",
+          "line": 4,
+          "end_line": 43,
+          "label": "Restricted route forwarding"
+        },
+        {
+          "path": "docker-compose.yml",
+          "line": 71,
+          "end_line": 76,
+          "label": "Local tunnel endpoint"
+        }
+      ],
+      "tag": ":3001"
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "Trusted Worker",
+      "sublabel": "Build / profile / receipt lanes",
+      "pos": [
+        660.0,
+        320
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "src/workers/build-worker.ts",
+          "line": 20,
+          "end_line": 53,
+          "label": "Independent durable lanes"
+        },
+        {
+          "path": "src/lib/build/pipeline.ts",
+          "line": 77,
+          "end_line": 120,
+          "label": "Scope check before publication"
+        },
+        {
+          "path": "docker-compose.yml",
+          "line": 160,
+          "end_line": 182,
+          "label": "Proxy-only worker egress"
+        }
+      ],
+      "tag": "Explicit Build + scope gate"
+    },
+    {
+      "id": "github",
+      "type": "external",
+      "label": "GitHub",
+      "sublabel": "Pinned source / draft PR",
+      "pos": [
+        970.0,
+        320
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "src/lib/build/workflow-steps.ts",
+          "line": 27,
+          "end_line": 60,
+          "label": "Trusted clone and push"
+        },
+        {
+          "path": "src/lib/build/github-pr.ts",
+          "line": 25,
+          "end_line": 66,
+          "label": "Draft PR reconciliation"
+        }
+      ]
+    },
+    {
+      "id": "anthropic",
+      "type": "external",
+      "label": "Anthropic",
+      "sublabel": "Model endpoint",
+      "pos": [
+        40.0,
+        610
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "src/model-gateway.ts",
+          "line": 65,
+          "end_line": 78,
+          "label": "Credentialed HTTPS request"
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "security",
+      "label": "Model gateway",
+      "sublabel": "Attempt token / usage ledger",
+      "pos": [
+        350.0,
+        610
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "src/model-gateway.ts",
+          "line": 9,
+          "end_line": 43,
+          "label": "Authenticated budget gate"
+        },
+        {
+          "path": "src/model-gateway.ts",
+          "line": 127,
+          "end_line": 135,
+          "label": "Durable usage settlement"
+        }
+      ],
+      "tag": "$5 estimate"
+    },
+    {
+      "id": "launcher",
+      "type": "security",
+      "label": "Restricted launcher",
+      "sublabel": "Fixed image / Docker socket",
+      "pos": [
+        660.0,
+        610
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 124,
+          "end_line": 147,
+          "label": "Launcher ownership and limits"
+        },
+        {
+          "path": "src/lib/build/isolated-runner.ts",
+          "line": 51,
+          "end_line": 79,
+          "label": "Attempt launch contract"
+        }
+      ]
+    },
+    {
+      "id": "execution",
+      "type": "backend",
+      "label": "Disposable execution",
+      "sublabel": "Claude Code / npm tests",
+      "pos": [
+        660.0,
+        880
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "src/execution/attempt.ts",
+          "line": 117,
+          "end_line": 187,
+          "label": "Repository execution lifecycle"
+        },
+        {
+          "path": "docker-compose.yml",
+          "line": 134,
+          "end_line": 139,
+          "label": "Bounded resources"
+        },
+        {
+          "path": "src/execution-launcher.ts",
+          "line": 30,
+          "end_line": 99,
+          "label": "Restricted container and egress"
+        }
+      ],
+      "tag": "Scoped files only"
+    },
+    {
+      "id": "proxy",
+      "type": "security",
+      "label": "Egress proxy",
+      "sublabel": "Allowed hosts only",
+      "pos": [
+        970.0,
+        880
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 78,
+          "end_line": 85,
+          "label": "Execution network egress"
+        },
+        {
+          "path": "src/egress-proxy.ts",
+          "line": 1,
+          "end_line": 100,
+          "label": "Allowlist enforcement"
+        }
+      ]
+    },
+    {
+      "id": "registries",
+      "type": "external",
+      "label": "Package registries",
+      "sublabel": "Locked npm dependencies",
+      "pos": [
+        970.0,
+        1130
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 78,
+          "end_line": 83,
+          "label": "Allowed registry hosts"
+        },
+        {
+          "path": "src/execution/attempt.ts",
+          "line": 117,
+          "end_line": 187,
+          "label": "npm install and tests"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "operator-to-web",
+      "from": "operator",
+      "to": "web",
+      "label": "Private UI",
+      "variant": "emphasis"
+    },
+    {
+      "id": "operator-to-voice",
+      "from": "operator",
+      "to": "voice",
+      "label": "Voice / WSS",
+      "variant": "default"
+    },
+    {
+      "id": "web-to-database",
+      "from": "web",
+      "to": "database",
+      "label": "State / events",
+      "variant": "default"
+    },
+    {
+      "id": "backups-to-database",
+      "from": "backups",
+      "to": "database",
+      "label": "Dump / restore",
+      "variant": "default"
+    },
+    {
+      "id": "voice-to-ingress",
+      "from": "voice",
+      "to": "ingress",
+      "label": "Tools / callback",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ingress-to-web",
+      "from": "ingress",
+      "to": "web",
+      "label": "Verified by web",
+      "variant": "security"
+    },
+    {
+      "id": "worker-to-database",
+      "from": "worker",
+      "to": "database",
+      "label": "Leased work",
+      "variant": "default"
+    },
+    {
+      "id": "worker-to-github",
+      "from": "worker",
+      "to": "github",
+      "label": "Via proxy: publish",
+      "variant": "default"
+    },
+    {
+      "id": "worker-to-launcher",
+      "from": "worker",
+      "to": "launcher",
+      "label": "Launch / cancel",
+      "variant": "security"
+    },
+    {
+      "id": "launcher-to-execution",
+      "from": "launcher",
+      "to": "execution",
+      "label": "Run / return patch",
+      "variant": "emphasis"
+    },
+    {
+      "id": "execution-to-gateway",
+      "from": "execution",
+      "to": "gateway",
+      "label": "Model requests",
+      "variant": "security"
+    },
+    {
+      "id": "gateway-to-anthropic",
+      "from": "gateway",
+      "to": "anthropic",
+      "label": "HTTPS",
+      "variant": "default"
+    },
+    {
+      "id": "gateway-to-database",
+      "from": "gateway",
+      "to": "database",
+      "label": "Budget / usage",
+      "variant": "dashed"
+    },
+    {
+      "id": "execution-to-proxy",
+      "from": "execution",
+      "to": "proxy",
+      "label": "Allowlisted HTTPS",
+      "variant": "security"
+    },
+    {
+      "id": "proxy-to-registries",
+      "from": "proxy",
+      "to": "registries",
+      "label": "Dependency fetch",
+      "variant": "default"
+    },
+    {
+      "id": "proxy-to-github",
+      "from": "proxy",
+      "to": "github",
+      "label": "Allowed GitHub",
+      "variant": "default"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Voice to Spec",
+      "items": [
+        "Web issues a private signed call URL. Tools require a live call capability; callbacks require HMAC.",
+        "Repository discovery uses a pinned commit. Partial and larger profiles require confirmed scope before Build."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Explicit Build, trusted publication",
+      "items": [
+        "Call completion and an explicit Build request gate generation. Worker validates changed paths before push.",
+        "Missing generated output requires a new Build. Publication reconciliation never reruns Claude."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Local isolation, explicit limits",
+      "items": [
+        "Single-host Docker Compose. Execution receives no database credentials, GitHub write token or Docker socket.",
+        "Docker shares the host kernel. Model budgets are estimates; external backup recovery still needs operator setup."
+      ]
+    }
+  ]
+}

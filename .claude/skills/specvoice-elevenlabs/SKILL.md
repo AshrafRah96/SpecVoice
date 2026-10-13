@@ -144,9 +144,10 @@ const toolConfig: ToolRequestModel = {
       method: WebhookToolApiSchemaConfigInputMethod.Post,
       requestBodySchema: {
         type: 'object',
-        required: ['session_id', 'path'],
+        required: ['session_id', 'session_token', 'path'],
         properties: {
           session_id: SESSION_ID_PROP,
+          session_token: { type: LiteralJsonSchemaPropertyType.String, dynamicVariable: 'session_token' },
           path: { type: LiteralJsonSchemaPropertyType.String, description: '...' },
         },
       },
@@ -155,7 +156,7 @@ const toolConfig: ToolRequestModel = {
 }
 ```
 
-Tool webhook routes are dispatched via a single dynamic route: `src/app/api/tools/[name]/route.ts` → `toolRegistry.dispatch(name, req)` in `src/lib/api/tool-registry.ts`. The ElevenLabs-facing URLs remain `/api/tools/{name}` (e.g. `/api/tools/read-file`). All handlers receive `session_id` in the body and use it to look up the session.
+Tool webhook routes are dispatched via a single dynamic route: `src/app/api/tools/[name]/route.ts` → `toolRegistry.dispatch(name, req)` in `src/lib/api/tool-registry.ts`. The ElevenLabs-facing URLs remain `/api/tools/{name}` (e.g. `/api/tools/read-file`). All handlers require `session_id` and the current call-bound `session_token` before repository access or mutation.
 
 ---
 
@@ -169,11 +170,14 @@ const conversation = useConversation({
   onModeChange: ({ mode }) => {}, // 'speaking' | 'listening'
 })
 
-// Start session
+// Operator-authenticated server route supplies private, call-bound credentials.
+const response = await fetch(`/api/sessions/${session.id}/call`, { method: 'POST' })
+if (!response.ok) throw new Error('Call credentials unavailable')
+const { signedUrl, capability, callId } = await response.json()
 await conversation.startSession({
-  agentId: process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID,
-  connectionType: 'websocket', // ← MUST be 'websocket'. 'webrtc' uses LiveKit v1 and drops.
-  dynamicVariables: { session_id: session.id },
+  signedUrl,
+  connectionType: 'websocket',
+  dynamicVariables: { session_id: session.id, session_token: capability, call_id: callId },
   overrides: { conversation: { textOnly: false } },
 })
 
@@ -183,6 +187,11 @@ conversation.isSpeaking // boolean — agent is currently speaking
 
 // End
 await conversation.endSession()
+await fetch(`/api/sessions/${session.id}/call`, {
+  method: 'DELETE',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ callId }),
+})
 ```
 
 ---
@@ -197,16 +206,17 @@ Configured in the **ElevenLabs dashboard** at `/app/agents/settings` (not via th
 {
   "type": "post_call_transcription",
   "data": {
+    "conversation_id": "<provider conversation ID>",
     "metadata": { "call_duration_secs": 123 },
     "transcript": [{ "role": "user", "message": "...", "time_in_call_secs": 0 }],
     "conversation_initiation_client_data": {
-      "dynamic_variables": { "session_id": "sess_abc123" }
+      "dynamic_variables": { "session_id": "sess_abc123", "call_id": "<call UUID>" }
     }
   }
 }
 ```
 
-**Signature verification** (conditional — only when `ELEVENLABS_WEBHOOK_SECRET` is set):
+**Signature verification**: every non-test runtime requires `ELEVENLABS_WEBHOOK_SECRET` (missing configuration returns `503`). Verify the signature before processing the payload:
 
 ```typescript
 const sigHeader = req.headers.get('ElevenLabs-Signature')

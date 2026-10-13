@@ -1,194 +1,66 @@
 # SpecVoice
 
-Code-aware voice agent on ElevenLabs Conversational AI. Joins phone calls or web conversations as senior engineer. Reads GitHub repo during call; outputs structured PR spec. Post-call build pipeline uses Claude Code in headless mode to implement spec and open draft PR.
+Private voice workspace: discuss a repository, produce a Spec, optionally build a draft PR. Discovery reads an immutable commit. Post-call Builds run Claude Code in disposable containers. A trusted Worker publishes changes for human review.
 
-**Stack:** Next.js 16 App Router · TypeScript · ElevenLabs Conversational AI · Anthropic Claude · Octokit · Tailwind + shadcn/ui · Vitest · Playwright
-
----
-
-## Setup Guide
-
-### 1. Prerequisites
-
-- Node.js 20.19+
-- [ElevenLabs](https://elevenlabs.io) account (free tier supports testing)
-- [Anthropic](https://console.anthropic.com) API key (post-call build pipeline)
-- GitHub personal access token (optional; required for private repos and higher rate limits)
-- [ngrok](https://ngrok.com) or equivalent local development tunnel (ElevenLabs must reach webhooks)
-
----
-
-### 2. Install dependencies
-
-```bash
-npm install
-```
-
----
-
-### 3. Configure environment variables
-
-Copy example; fill values:
-
-```bash
-cp .env.local.example .env.local
-```
-
-| Variable                             | Required                 | Description                                                           |
-| ------------------------------------ | ------------------------ | --------------------------------------------------------------------- |
-| `ELEVENLABS_API_KEY`                 | Yes                      | ElevenLabs → Profile → API Keys                                       |
-| `ELEVENLABS_AGENT_ID`                | After step 5             | Auto-filled by `setup-agent.ts` output                                |
-| `NEXT_PUBLIC_ELEVENLABS_AGENT_ID`    | After step 5             | Same value; required for browser web-call widget                      |
-| `NEXT_PUBLIC_APP_URL`                | Yes                      | Public URL (local ngrok tunnel, e.g. `https://abc123.ngrok-free.app`) |
-| `GITHUB_TOKEN`                       | Recommended              | Personal access token with `repo` read scope                          |
-| `ANTHROPIC_API_KEY`                  | Yes (build pipeline)     | Claude Code CLI post-call build key                                   |
-| `ELEVENLABS_WEBHOOK_SECRET`          | Recommended              | HMAC secret verifying ElevenLabs webhook signatures                   |
-| `SESSION_CAPABILITY_SECRET`          | Required for public use  | Random 32+ character secret for session capabilities                  |
-| `SPECVOICE_LOCAL_REPO_ROOT`          | Required for local paths | Allowed root for `repoLocalPath`                                      |
-| `SPECVOICE_ALLOW_IN_MEMORY_SESSIONS` | Local only               | Set `true` only for deliberate single-process deployments             |
-
-> **Local development:** `NEXT_PUBLIC_APP_URL` must be ngrok tunnel URL, not `localhost`. ElevenLabs calls tool webhooks over internet; localhost is unreachable.
-
----
-
-### 4. Start your tunnel
-
-```bash
-ngrok http 3000
-```
-
-Set `NEXT_PUBLIC_APP_URL` in `.env.local` to ngrok's printed `https://` URL. Keep ngrok running during development.
-
-> When ngrok URL changes, update `NEXT_PUBLIC_APP_URL` and re-run step 5. Free tier assigns new URL each restart.
-
----
-
-### 5. Start the dev server
-
-```bash
-npm run dev
-```
-
----
-
-### 6. Create the ElevenLabs agent
-
-Script creates or updates ElevenLabs agent, registers all tool webhook URLs under `NEXT_PUBLIC_APP_URL`, and prints agent ID:
-
-```bash
-npx tsx src/scripts/setup-agent.ts
-```
-
-Copy printed agent ID into `.env.local`:
-
-```
-ELEVENLABS_AGENT_ID=agent_xxxxxxxxxxxx
-NEXT_PUBLIC_ELEVENLABS_AGENT_ID=agent_xxxxxxxxxxxx
-```
-
-Restart dev server after updating `.env.local`.
-
-> Re-run script whenever ngrok URL changes; ElevenLabs agent config stores tool webhook URLs.
-
----
-
-### 7. Configure the post-call webhook in ElevenLabs
-
-Configure once manually; `setup-agent.ts` does **not automate** this step.
-
-1. Go to [ElevenLabs → Settings → Webhooks](https://elevenlabs.io/app/settings/webhooks)
-2. Create webhook:
-   - **URL:** `https://<your-ngrok-url>/api/agent/post-call`
-   - **Auth Method:** HMAC
-3. Copy ElevenLabs signing secret into `.env.local`:
-   ```
-   ELEVENLABS_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
-   ```
-4. Open [ElevenLabs → Agents → your agent → Settings](https://elevenlabs.io/app/agents). Assign webhook under **Post-Call Webhook**; tick **Transcript** event.
-5. Restart dev server.
-
----
-
-### 8. Verify the setup
-
-Open dashboard: `http://localhost:3000`.
-
-1. Enter GitHub repo URL; click **Start Session**
-2. Click **Start Web Call**; browser mic activates and connects to agent
-3. Talk; agent reads repo, asks clarifying questions, logs decisions live in dashboard
-4. End call; within seconds, session status should change from **In Call** to **Build It** (buildStatus: ready)
-
-Confirm webhooks in ngrok inspector: `http://localhost:4040`. Expect POSTs to `/api/tools/read-file`, `/api/tools/save-decision`, and `/api/agent/post-call`.
-
----
-
-## Commands
-
-```bash
-npm run dev            # start dev server
-npm run build          # production build
-npm run lint           # lint
-npm run typecheck      # TypeScript check
-npm run format:check   # Prettier check
-npm test               # vitest unit tests
-npm run test:e2e       # Playwright E2E tests (requires dev server running)
-npm run verify         # format, typecheck, lint, unit tests, and production build
-npx tsx src/scripts/setup-agent.ts   # create/update ElevenLabs agent
-```
-
-Requires Node.js 20.19 or newer. `.nvmrc` pins CI and local baseline.
-
-See [documentation map](./docs/README.md): architecture, API, build, extension, testing, agent guidance.
-
----
+**Stack:** Next.js · TypeScript · ElevenLabs · Claude Code · PostgreSQL · Docker Compose.
 
 ## Architecture
 
-```
-Browser (Next.js dashboard)
-  └─ creates session via POST /api/sessions
-  └─ subscribes to real-time updates via SSE /api/sessions/:id/events
-  └─ starts web call via @elevenlabs/react → ElevenLabs WebRTC
+![SpecVoice architecture: private voice discovery, durable PostgreSQL state, isolated Builds and trusted GitHub publication](docs/diagrams/specvoice-architecture.svg)
 
-ElevenLabs Agent (Claude LLM + voice)
-  └─ reads repo files   → POST /api/tools/read-file
-  └─ saves decisions    → POST /api/tools/save-decision
-  └─ flags questions    → POST /api/tools/flag-question
-  └─ generates spec     → POST /api/tools/generate-spec
-  └─ post-call webhook  → POST /api/agent/post-call
+[Interactive Archify diagram](docs/diagrams/specvoice-architecture.html) · [Diagram source](docs/diagrams/specvoice-architecture.json). Download HTML and open locally; GitHub previews the SVG above.
 
-Post-call build pipeline
-  └─ triggered by "Build It" button → POST /api/sessions/:id/build
-  └─ runs Claude Code CLI in headless mode
-  └─ opens a draft PR on GitHub
+## Local setup
+
+Use Node from `.nvmrc` and Docker Engine 28+. Reserve capacity for a 2-CPU, 4-GiB Build plus the app and database.
+
+```bash
+npm ci
+bash scripts/setup-local.sh
+docker compose up --build -d
 ```
 
-No vector database, embeddings, or RAG. Agent reads files on demand via tools; reasons about code natively.
+Wizard writes private `.env`, hashes the operator passphrase, generates secrets, and guides provider, disposable-repository and external-backup setup. Secrets stay local. Missing provider credentials disable that live path; configure them later.
 
----
+Sign in at [localhost:3000](http://localhost:3000). Keep dashboard private. Expose only `localhost:3001` provider ingress through an HTTPS tunnel or reverse proxy. Set `NEXT_PUBLIC_APP_URL` to that public URL. Run `npm run setup:agent` after URL or agent-config changes. Enable ElevenLabs signed post-call webhooks; wizard links the steps.
 
-## Troubleshooting
+`docker compose down` preserves database storage. Upgrade and restore steps: [local runtime](docs/local-runtime.md), [backup recovery](docs/backups.md). Never remove volumes holding saved Sessions.
 
-**Session stuck in "In Call" after the call ends**
-Post-call webhook didn't fire. Check:
+## Product flow
 
-1. ElevenLabs webhook URL matches current ngrok URL
-2. `ELEVENLABS_WEBHOOK_SECRET` in `.env.local` matches the HMAC secret in ElevenLabs
-3. Dev server restarted after adding secret
-4. ngrok inspector (`localhost:4040`) shows a POST to `/api/agent/post-call`
+1. Create or reopen a Session. URL survives reloads; history survives restarts.
+2. Wait for Repository Profile. Bounded voice discovery can precede scope confirmation.
+3. Discuss change. Agent reads permitted files, records decisions, produces a Spec.
+4. Confirm required Scope Plans. Partial and mid/large profiles require explicit scope.
+5. End call. Wait for signed transcript callback. Select **Build It**.
+6. Review draft PR. Interrupted generation needs a new explicit Build; publication recovery never repeats Claude.
 
-**Agent connects but no audio**
+Calls: 45-minute maximum; continue with another call in the same Session. Logins: eight hours. Logout preserves accepted Builds. **Mark call failed** abandons a lost callback, retaining Specs and decisions.
 
-1. Check browser tab isn't muted (right-click tab → Unmute)
-2. Check system audio output device
-3. Click page after starting call (browsers may suspend audio context until user gesture)
+## Verification
 
-**Tool webhooks not firing (filesRead stays empty)**
-Agent tool URLs point to wrong host. Update `NEXT_PUBLIC_APP_URL` in `.env.local`, then re-run `setup-agent.ts`.
+```bash
+npm run verify              # format, types, lint, unit tests, production build
+npm run eval:offline        # real application contracts, no paid providers
+npm run test:e2e:install    # pinned Chromium
+npm run test:e2e            # isolated browser server
+npm run test:integration    # requires disposable TEST_DATABASE_URL ending in _test
+npm run test:compose        # disposable complete deployment; requires Docker
+npm run test:isolation      # real pinned Claude CLI, synthetic model transport
+npm run test:backups        # requires image specvoice-backup:test
+npm run bench:repositories # real Git snapshots, 5k–100k+ synthetic files
+```
 
-**ngrok URL changed**
+`test:compose` builds the image for `test:isolation`. Backup test image: `docker build --target backup -t specvoice-backup:test .`. Docker checks remove only their own resources. CI keeps evaluation and deployment artifacts.
 
-1. Update `NEXT_PUBLIC_APP_URL` in `.env.local`
-2. Re-run `npx tsx src/scripts/setup-agent.ts`
-3. Update post-call webhook URL in ElevenLabs dashboard manually
-4. Restart dev server
+Status: `docker compose exec worker npm run ops:status`. [Evaluation](docs/evaluation.md): prompt-version reports, spending estimates, separate live acceptance.
+
+## Supported limits
+
+Verified Builds: Node/npm, lockfile, explicit test command. Install lifecycle scripts default off. Source export: at most 64 MiB of regular tracked files. Workspace: 2 GiB default. No symlinks, submodules, Git LFS hydration or other build toolchains.
+
+Single operator, single host. Docker shares host kernel. Model estimates cannot guarantee a billing ceiling. Synthetic checks do not prove customer impact, production load or paid voice/Build acceptance. External-disk recovery requires a mounted destination and separately recoverable password.
+
+[Documentation map](docs/README.md) · [Agent contract](AGENTS.md) · [Security](SECURITY.md)
+
+Built by [Ashraf Rahman](https://github.com/AshrafRah96).

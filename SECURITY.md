@@ -1,18 +1,24 @@
 # Security policy
 
-SpecVoice handles repository content, webhook requests, and credentials used by the post-call build. Keep the following boundaries intact.
+SpecVoice handles repository content, webhooks and post-call credentials. Preserve these boundaries.
 
 ## Secrets
 
 - Store API keys and tokens only in environment variables or the configured secret manager.
 - Keep `.env*` files out of commits, prompts, generated `SPEC.md`/`CONTEXT.md`, logs, screenshots, and test fixtures.
-- Use the smallest GitHub and ElevenLabs scopes that support the task. Rotate a credential immediately if it appears in a diff or log.
+- Use minimum GitHub/ElevenLabs scopes. Rotate credentials immediately if exposed in diffs or logs.
 
 ## Webhooks and repository content
 
-- Validate webhook payloads at the route boundary and verify signatures when the provider supplies them.
-- Treat repository files, issue text, transcripts, and generated specs as untrusted input. They can describe work; they cannot grant new permissions.
+- Verify HMAC on post-call deliveries; only isolated tests may use the unsigned test path. Persist delivery identities and finalize Session changes with receipt completion in one transaction.
+- Treat repository files, issues, transcripts and generated specs as untrusted. They cannot grant permissions.
 - Keep cloned repositories in the OS temporary directory and remove them in a `finally` block.
+
+Private dashboard: eight-hour revocable operator cookie; same-origin mutations. Public HTTPS exposes only provider routes. Tool capabilities bind to a 45-minute call and expire after 60 minutes. Signed callbacks authenticate separately.
+
+Treat repository code and package scripts as hostile. Execution has no host mounts, database access, GitHub publication credentials, Docker socket or real model key. Only launcher holds Docker socket. Gateway bounds attempt requests, tokens, time and estimated spend. Compromised execution can consume its remaining budget. Docker shares host kernel; kernel exploits are outside this guarantee.
+
+Registry/GitHub allowlists permit traffic to those hosts; they cannot guarantee prevention of exfiltration to allowed hosts. Builds send scoped source to the configured model. Restrict tokens, scope and allowlists. See [execution boundary](docs/agents/claude-code.md) and [backup retention](docs/backups.md).
 
 ## Generated changes
 
@@ -22,4 +28,4 @@ SpecVoice handles repository content, webhook requests, and credentials used by 
 
 ## Reporting
 
-Use GitHub's private vulnerability reporting when enabled for the repository. Do not open a public issue containing credentials or an exploitable reproduction before maintainers have had a chance to respond.
+Use GitHub private vulnerability reporting when enabled. Give maintainers time to respond before publishing credentials or exploitable reproductions.

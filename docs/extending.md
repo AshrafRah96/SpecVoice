@@ -1,199 +1,42 @@
 # Extending SpecVoice
 
-How to add new capabilities to the agent. The most common extension is a new tool: a webhook the agent can call during a conversation to do something with the repo or session.
+Read [architecture](./architecture.md), the [glossary](../GLOSSARY.md), and the nearest implementation. Keep domain rules behind existing interfaces. Use memory for isolated tests; PostgreSQL for durable behavior.
 
-Before reading this, skim [architecture.md](./architecture.md) — particularly the sections on tool entities and `session_id` routing.
+## Adding an agent tool
 
----
+Tools need three definitions: server registry, provider tool schema, and the agent's complete tool-ID list.
 
-## Adding a new agent tool
+1. Register a kebab-case name in [tool-registry.ts](../src/lib/api/tool-registry.ts). The dynamic route dispatches registered names; no new route needed.
+2. Use `createToolHandler` for Session operations or `createCodeToolHandler` for repository discovery. These handlers validate input and verify the active call's capability. The code handler also requires a ready or partial profile and supplies a pinned, scoped `CodeSource`.
+3. Add the matching snake_case provider definition to `buildToolConfigs` in [tool-definitions.ts](../src/lib/agent/tool-definitions.ts). Reuse `SESSION_ID_PROP` and `SESSION_TOKEN_PROP`; the private call route issues these dynamic variables when each call starts. Check field names against the installed ElevenLabs SDK types.
+4. Update [tool-name mapping](./agents/elevenlabs-tools.md), [system prompt](./system-prompt.md), and [API reference](./api-reference.md). Preserve completeness metadata on discovery results.
+5. After testing, run `npm run setup:agent` with the intended provider configuration. This writes provider configuration: it upserts all definitions and replaces the agent's complete tool-ID list. Manually added provider tools are not preserved unless included in `buildToolConfigs`.
 
-A tool has three parts that must all be in sync:
-
-1. **The route** — handles the webhook call from ElevenLabs
-2. **The tool definition** — tells ElevenLabs the tool's name, description, and parameter schema
-3. **The agent config** — references the tool by ID so the agent can use it
-
-`setup-agent.ts` wires parts 2 and 3 together. You own part 1.
-
----
-
-### Step 1: Create the route
-
-Create `src/app/api/tools/<your-tool-name>/route.ts`. Prefer the shared `createToolHandler` or `createCodeToolHandler`; they validate the body and verify the session capability before your handler runs.
+Registry example: bounded read through the shared code handler.
 
 ```typescript
-import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-import { sessionStore } from '@/lib/session/store'
-import { parseRequestBody, sessionNotFound, validationError } from '@/lib/api/helpers'
-
-// Define your input schema. session_id and session_token are always required.
-const schema = z.object({
-  session_id: z.string(),
-  session_token: z.string(),
-  // your additional parameters here
-  target: z.string(),
-})
-
-export async function POST(request: NextRequest) {
-  const body = await parseRequestBody(request)
-  if (body === null) return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 })
-
-  const result = schema.safeParse(body)
-  if (!result.success) return validationError(result.error.issues)
-  const { session_id, target } = result.data
-
-  const session = sessionStore.getSession(session_id)
-  if (!session) return sessionNotFound(session_id)
-
-  // Do your work here.
-  const output = await doSomething(target)
-
-  // If your tool mutates session state, use updateSession — it auto-broadcasts session_updated.
-  // sessionStore.updateSession(session_id, { someField: newValue })
-
-  return NextResponse.json({ output })
-}
+toolRegistry.register(
+  'read-config',
+  createCodeToolHandler(z.object({ path: z.string() }), async (_session, source, input, request) => {
+    const content = await source.readFile(input.path, undefined, undefined, { signal: request.signal })
+    return NextResponse.json({ content })
+  })
+)
 ```
 
-**Rules:**
+The registry already imports `z`, `NextResponse`, and shared handlers. Do not bypass `CodeSource` with direct filesystem access or unpinned GitHub requests. Scope and budgets must apply before repository work.
 
-- Use `@/` path alias for all imports — never relative paths from `src/lib/` to `src/app/`
-- Validate with Zod. Trust nothing from the incoming webhook body
-- If the tool mutates session state, use `sessionStore.updateSession()` — it broadcasts `session_updated` automatically
-- If the tool only reads (like `list_files` or `search_code`), no broadcast is needed
-- Return specific, actionable error messages — not `"Something went wrong"`
+Session mutations must await methods from `getSessionRepository()`. Pass `session.currentCallId ?? undefined` to call-aware operations, as existing decision, file-read, question, and Spec tools do. The adapter rechecks call identity while persisting the mutation, preventing a stale request from changing a later call's Session. Do not import the memory singleton into production routes.
 
----
+## Adding Session fields or events
 
-### Step 2: Define the tool
+- Define data in [session/types.ts](../src/lib/session/types.ts). Update initial values and behavior in both [store.ts](../src/lib/session/store.ts) and [postgres-repository.ts](../src/lib/session/postgres-repository.ts).
+- Extend [SessionRepository](../src/lib/session/repository.ts) only when callers need a new operation. Persist state changes and associated events together; callers should not perform a separate broadcast after a database write.
+- Use additive SQL migrations for durable schema changes. Preserve existing Session/event IDs and readable older records. Raw conversation copies must participate in [retention](./backups.md).
+- Prefer the existing `session_updated` event for state changes. A new event also needs shared types, adapter persistence/replay, browser handling in [useSession.ts](../src/components/hooks/useSession.ts), and reference documentation. Keep SSE transport and replay sequencing in the existing event route.
 
-Open [src/lib/agent/tool-definitions.ts](../src/lib/agent/tool-definitions.ts) and add your tool definition.
+## Verification
 
-**Before writing anything**, check the field names in `node_modules/@elevenlabs/elevenlabs-js/dist/api/types/`. The REST API reference uses `snake_case`; the SDK uses `camelCase`. Getting this wrong produces no error; the field is ignored. See [elevenlabs-sdk-holes.md §7](./elevenlabs-sdk-holes.md).
+Test through the shared handler or repository interface: valid input, rejected capability, stale call, invalid input, scope denial, and applicable cancellation/completeness behavior. Use real PostgreSQL integration tests for transaction, event, lease, or receipt changes. Extend offline fixtures for new enforceable permissions or Build constraints.
 
-```typescript
-import {
-  LiteralJsonSchemaPropertyType,
-  WebhookToolApiSchemaConfigInputMethod,
-  ToolRequestModel,
-} from '@elevenlabs/elevenlabs-js/api'
-
-// session_id and session_token are injected at runtime — never ask the agent to reason about them
-const SESSION_ID_PROP = {
-  type: LiteralJsonSchemaPropertyType.String,
-  dynamicVariable: 'session_id',
-} as const
-
-const SESSION_TOKEN_PROP = {
-  type: LiteralJsonSchemaPropertyType.String,
-  dynamicVariable: 'session_token',
-  description: 'Short-lived capability issued when the session was created.',
-} as const
-
-export function buildYourToolDefinition(appUrl: string): ToolRequestModel {
-  return {
-    toolConfig: {
-      type: 'webhook',
-      name: 'your_tool_name', // snake_case, matches what the agent calls
-      description: 'One sentence. What does this tool do and when should the agent use it?',
-      apiSchema: {
-        url: `${appUrl}/api/tools/your-tool-name`,
-        method: WebhookToolApiSchemaConfigInputMethod.Post,
-        requestBodySchema: {
-          type: 'object',
-          required: ['session_id', 'session_token', 'target'],
-          properties: {
-            session_id: SESSION_ID_PROP,
-            session_token: SESSION_TOKEN_PROP,
-            target: {
-              type: LiteralJsonSchemaPropertyType.String,
-              description: 'What this parameter is and what format it expects.',
-            },
-          },
-        },
-      },
-    },
-  }
-}
-```
-
-**Important:** Every property in `requestBodySchema` — including array `items` — must have one of `description`, `dynamicVariable`, `isSystemProvided`, or `constantValue` set. A bare `{ type: 'string' }` returns HTTP 400. See [elevenlabs-sdk-holes.md §4](./elevenlabs-sdk-holes.md).
-
----
-
-### Step 3: Register the tool in setup-agent.ts
-
-Open [src/scripts/setup-agent.ts](../src/scripts/setup-agent.ts). The script maintains a list of tool builder functions. Add yours:
-
-```typescript
-import { buildYourToolDefinition } from '@/lib/agent/tool-definitions'
-
-// In the tools array passed to upsertTools():
-buildYourToolDefinition(appUrl),
-```
-
-The script does an idempotent upsert: it creates the tool if it doesn't exist, updates it if it does, then updates the agent config with the complete `toolIds` list.
-
-> `toolIds` is a **replacement**, not a merge. The setup script always passes the full list. If you manually add a tool to the agent in the ElevenLabs dashboard, `setup-agent.ts` will overwrite it. Keep the script as the single source of truth.
-
----
-
-### Step 4: Re-run setup
-
-```bash
-npx tsx src/scripts/setup-agent.ts
-```
-
-This creates/updates the tool in ElevenLabs and updates the agent's `toolIds`. You don't need to update `ELEVENLABS_AGENT_ID` — the agent already exists, it just gets new tools.
-
----
-
-### Step 5: Update the system prompt (if needed)
-
-If the agent should understand when and how to use the new tool, update [docs/system-prompt.md](./system-prompt.md). The prompt is loaded at runtime by [src/lib/agent/system-prompt.ts](../src/lib/agent/system-prompt.ts).
-
-Write the description the way you'd explain it to a senior engineer: what the tool does, what information it needs, and in what situations they should reach for it.
-
----
-
-### Step 6: Add it to the API reference
-
-Document the new route in [docs/api-reference.md](./api-reference.md) under **Tool Webhooks**. Include: method, URL, request body, response, and whether it emits an SSE event.
-
----
-
-## Adding a new SSE event type
-
-If your tool needs to push a new event type to the dashboard (beyond `session_updated`):
-
-1. Add the new event to the `SessionEvent` union in [src/lib/session/types.ts](../src/lib/session/types.ts)
-2. Broadcast it with `sessionStore.broadcastEvent(sessionId, { type: 'your_event', ... })`
-3. Handle it in [src/components/hooks/useSession.ts](../src/components/hooks/useSession.ts)
-4. Document it in [docs/api-reference.md](./api-reference.md)
-
-Prefer `session_updated` for state changes; it already carries the full session. Only add a new event type when you need a signal that doesn't map to a session mutation (like `call_ended` or `build_started`).
-
----
-
-## Adding a new session field
-
-If your tool needs to store new data on the session:
-
-1. Add the field to the `Session` interface in [src/lib/session/types.ts](../src/lib/session/types.ts)
-2. Initialise it in `sessionStore.createSession()` in [src/lib/session/store.ts](../src/lib/session/store.ts)
-3. Update it via `sessionStore.updateSession(sessionId, { yourField: value })` — this broadcasts automatically
-
-Never redeclare session fields locally in route handlers or components. Always import from `src/lib/session/types.ts`.
-
----
-
-## What doesn't need to change
-
-When adding a tool, you do **not** need to:
-
-- Touch the webhook signature verification logic (`post-call/route.ts`)
-- Modify the SSE stream handler (`events/route.ts`)
-- Change anything in the dashboard unless you're adding a new UI for the new data
-- Add a new `ELEVENLABS_*` env variable — the agent ID and API key are shared across all tools
+Run `npm run verify`; run `npm run test:e2e` for browser or SSE changes and `npm run test:integration` against disposable PostgreSQL for durable changes. Provider setup and paid live evaluations remain separate from deterministic verification; see [evaluation](./evaluation.md).

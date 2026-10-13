@@ -62,3 +62,6 @@ graphify-out/*/
 
 .next-e2e/
 artifacts/
+
+# Archify captures and machine receipts; published diagram lives in docs/diagrams.
+.archify/
